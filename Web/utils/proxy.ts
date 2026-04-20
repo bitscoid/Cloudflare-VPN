@@ -1,11 +1,11 @@
 import { getFlagEmoji } from "./string";
 
 const vlessTemplate =
-  "vless://fc60147e-76b8-4bc5-b691-90b2da79e3d2@172.67.73.39:443?encryption=none&type=ws&host=nautica.foolvpn.me&security=tls&sni=nautica.foolvpn.me&path=%2F172.232.239.151-587#1%20%F0%9F%87%AE%F0%9F%87%A9%20Akamai%20Connected%20Cloud%20WS%20TLS%20[nautica]";
+  "vless://fc60147e-76b8-4bc5-b691-90b2da79e3d2@support.zoom.us:443?encryption=none&type=ws&host=vpn.bits.co.id&security=tls&sni=vpn.bits.co.id&path=%2F172.232.239.151-587#1%20%F0%9F%87%AE%F0%9F%87%A9%20Akamai%20Connected%20Cloud%20WS%20TLS%20[vpn]";
 const trojanTemplate =
-  "trojan://86768774-70b2-4c15-80c3-02066fb1e3b6@172.67.73.39:443?encryption=none&type=ws&host=nautica.foolvpn.me&security=tls&sni=nautica.foolvpn.me&path=%2F35.219.50.99-443#1%20%F0%9F%87%AE%F0%9F%87%A9%20Google%20Cloud%20WS%20TLS%20[nautica]";
+  "trojan://86768774-70b2-4c15-80c3-02066fb1e3b6@support.zoom.us:443?encryption=none&type=ws&host=vpn.bits.co.id&security=tls&sni=vpn.bits.co.id&path=%2F35.219.50.99-443#1%20%F0%9F%87%AE%F0%9F%87%A9%20Google%20Cloud%20WS%20TLS%20[vpn]";
 const ssTemplate =
-  "ss://bm9uZTpkMDIzMmM1NS1kZjE0LTRjMzMtYTMxOS1jNGM1NTVmMmIwZjQ%3D@172.67.73.39:443?plugin=v2ray-plugin%3Btls%3Bmux%3D0%3Bmode%3Dwebsocket%3Bpath%3D%2F43.218.77.16-1443%3Bhost%3Dnautica.foolvpn.me#1%20%F0%9F%87%AE%F0%9F%87%A9%20Amazon.com%20WS%20TLS%20[nautica]";
+  "ss://bm9uZTpkMDIzMmM1NS1kZjE0LTRjMzMtYTMxOS1jNGM1NTVmMmIwZjQ%3D@support.zoom.us:443?plugin=v2ray-plugin%3Btls%3Bmux%3D0%3Bmode%3Dwebsocket%3Bpath%3D%2F43.218.77.16-1443%3Bhost%3Dvpn.bits.co.id#1%20%F0%9F%87%AE%F0%9F%87%A9%20Amazon.com%20WS%20TLS%20[vpn]";
 
 type proxyType = {
   ip: string;
@@ -18,8 +18,9 @@ export type ProxySettings = {
   server: string;
   host: string;
   protocol: protocolsType;
-  format: "mihomo" | "clash" | "bfr" | "sfa" | "raw";
+  format: "mihomo" | "clash" | "provider" | "raw";
   tls: boolean;
+  wildcard: boolean;
 };
 
 export function getProtocols() {
@@ -27,7 +28,7 @@ export function getProtocols() {
 }
 
 export function getFormats() {
-  return ["mihomo", "clash", "bfr", "sfa", "raw"];
+  return ["mihomo", "clash", "provider", "raw"];
 }
 
 export async function parseProxies(proxies: proxyType[], settings: ProxySettings) {
@@ -39,10 +40,8 @@ export async function parseProxies(proxies: proxyType[], settings: ProxySettings
     case "clash":
     case "mihomo":
       return proxyParser.toClash();
-    case "sfa":
-      return await proxyParser.toSFA();
-    case "bfr":
-      return proxyParser.toBFR();
+    case "provider":
+      return proxyParser.toProvider();
   }
 }
 
@@ -85,9 +84,10 @@ class ParseProxies {
 
         if (config.protocol == "ss:") {
           let ssPlugin: string[] = (configSearchParams.get("plugin") as string)?.split(";");
+          const effectiveHost = this.settings.wildcard ? `${this.settings.server}.${this.settings.host}` : this.settings.host;
 
           ssPlugin = ssPlugin?.map((key) => (key.startsWith("path") ? `path=/${proxy.ip}-${proxy.port}` : key));
-          ssPlugin = ssPlugin?.map((key) => (key.startsWith("host") ? `host=${this.settings.host}` : key));
+          ssPlugin = ssPlugin?.map((key) => (key.startsWith("host") ? `host=${effectiveHost}` : key));
 
           if (!this.settings.tls) {
             ssPlugin?.splice(ssPlugin.indexOf("tls"), 1);
@@ -98,8 +98,9 @@ class ParseProxies {
           if (!this.settings.tls) {
             configSearchParams?.set("security", "none");
           }
-          configSearchParams?.set("host", this.settings.host);
-          configSearchParams?.set("sni", this.settings.host);
+          const effectiveHost = this.settings.wildcard ? `${this.settings.server}.${this.settings.host}` : this.settings.host;
+          configSearchParams?.set("host", effectiveHost);
+          configSearchParams?.set("sni", effectiveHost);
         }
 
         config.hash = `${getFlagEmoji(proxy.country)} ${proxy.isp} WS ${this.settings.tls ? "TLS" : "NTLS"} [${
@@ -117,43 +118,27 @@ class ParseProxies {
   // clash or mihomo
   async toClash() {
     const proxies = this.toRaw();
-    const res = await fetch("https://api.foolvpn.web.id/convert", {
+    const res = await fetch("https://vpn.bits.co.id/convert", {
       method: "post",
       body: JSON.stringify({
         url: proxies.split("\n").join(","),
         format: "clash",
-        template: "cf",
       }),
     });
 
     return await res.text();
   }
 
-  async toSFA() {
+  async toProvider() {
     const proxies = this.toRaw();
-    const res = await fetch("https://api.foolvpn.web.id/convert", {
+    const res = await fetch("https://vpn.bits.co.id/convert", {
       method: "post",
       body: JSON.stringify({
         url: proxies.split("\n").join(","),
-        format: "sfa",
-        template: "cf",
+        format: "provider",
       }),
     });
 
-    return JSON.stringify(await res.json(), null, "  ");
-  }
-
-  async toBFR() {
-    const proxies = this.toRaw();
-    const res = await fetch("https://api.foolvpn.web.id/convert", {
-      method: "post",
-      body: JSON.stringify({
-        url: proxies.split("\n").join(","),
-        format: "bfr",
-        template: "cf",
-      }),
-    });
-
-    return JSON.stringify(await res.json(), null, "  ");
+    return await res.text();
   }
 }

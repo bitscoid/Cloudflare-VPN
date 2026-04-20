@@ -1,4 +1,4 @@
-# Welcome to Nautica
+# Welcome to VPN
 
 Sebuah repository serverless tunnel studi kasus Indonesia
 
@@ -26,11 +26,12 @@ Sebuah repository serverless tunnel studi kasus Indonesia
   - [x] Negara `&cc=ID,SG,...`
 - [x] Subscription API
   - [x] Country Code `&cc=ID,SG,JP,KR,...`
-  - [x] Format `&format=clash` (raw, clash, sfa, bfr, v2ray)
+  - [x] Format `&format=clash` (raw, clash, mihomo, provider, v2ray)
   - [x] Limit `&limit=10`
   - [x] VPN `&vpn=vless,trojan,ss,vmess`
   - [x] Port `&port=443,80`
   - [x] Domain `&domain=zoom.us`
+  - [x] Provider Server `&provider-server=support.zoom.us` (untuk `format=provider`)
 - [x] Tombol `Deploy to workers` untuk instant deployment
 
 # Todo (Belum Selesai)
@@ -58,7 +59,7 @@ Kode ini masih perlu banyak perbaikan, jadi silahkan berkontribusi dan berikan P
 ## Instant
 
 Klik tombol di bawah  
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/FoolVPN-ID/Nautica)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bitscoid/Cloudflare-VPN/tree/main/Proxy)
 
 ## Manual
 
@@ -70,7 +71,7 @@ Klik tombol di bawah
 6. Deploy
 7. Buka `https://DOMAIN_WORKER_KALIAN/sub`
 
-- Contoh daftar proxy [proxyList.txt](https://raw.githubusercontent.com/dickymuliafiqri/Nautica/refs/heads/main/proxyList.txt)
+- Contoh daftar proxy [proxyList.txt](https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/main/Proxy/proxyList.txt)
 - Contoh reverse proxy [example.com](https://example.com)
 
 ## Cara Aktivasi API
@@ -87,11 +88,11 @@ Berikut cara aktivasinya:
 
 1. Selesaikan langkah [Aktivasi API](#cara-aktivasi-api)
 2. Isi variable `rootDomain` dengan domain utama kalian
-   - Contoh: Domain workers `nautica.foolvpn.me`, berarti domain utamanya adalah `foolvpn.me`
+   - Contoh: Domain workers `vpn.bits.co.id`, berarti domain utamanya adalah `bits.co.id`
 3. Isi variable `serviceName` dengan nama workers kalian
-   - Contoh: Domain workers `nautica.foolvpn.me`, berarti nama workersnya adalah `nautica`
+   - Contoh: Domain workers `vpn.bits.co.id`, berarti nama workersnya adalah `vpn`
 4. Buat custom domain di pengaturan workers dengan kombinasi `serviceName`.`rootDomain`
-   - Contoh: `nautica.foolvpn.me`
+   - Contoh: `vpn.bits.co.id`
 
 # Endpoint
 

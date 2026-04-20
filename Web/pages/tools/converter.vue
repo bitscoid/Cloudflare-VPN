@@ -1,25 +1,29 @@
 <script setup lang="ts">
+definePageMeta({
+  title: "Convert",
+});
+
 const rawProxies = ref("");
 const convertedProxies = ref("");
-const convertFormats = ref(["clash", "sfa", "bfr"]);
+const convertFormats = ref(["clash", "provider"]);
+const isLoading = ref(false);
 
 async function convertProxiesTo(format: string) {
+  isLoading.value = true;
   try {
-    const res = await fetch("https://api.foolvpn.me/convert", {
+    const res = await fetch("https://vpn.bits.co.id/convert", {
       method: "post",
       body: JSON.stringify({
         url: rawProxies.value.split("\n").join(","),
-        format: format,
+        format,
       }),
     });
 
-    if (format == "clash") {
-      convertedProxies.value = await res.text();
-    } else {
-      convertedProxies.value = JSON.stringify(await res.json(), null, "  ");
-    }
+    convertedProxies.value = await res.text();
   } catch (e: any) {
     convertedProxies.value = e.message;
+  } finally {
+    isLoading.value = false;
   }
 }
 
@@ -29,42 +33,116 @@ function copyToClipboard() {
 </script>
 
 <template>
-  <div class="w-full h-full flex flex-col items-center justify-center gap-10 py-10">
-    <fieldset class="fieldset w-[80%] lg:w-[50%]">
-      <legend class="fieldset-legend mb-2">VPN Raw URL</legend>
+  <section class="tool-shell">
+    <div class="tool-head">
+      <h1>Convert</h1>
+      <p>Convert raw URLs into Clash or provider output with one click.</p>
+    </div>
+
+    <div class="tool-card">
+      <label class="label">Raw URL</label>
       <textarea
         v-model="rawProxies"
-        class="textarea textarea-primary h-24 w-full overflow-scroll"
-        placeholder="vless://....."
+        class="surface"
+        placeholder="vless://..."
       ></textarea>
-    </fieldset>
 
-    <div class="flex gap-2">
-      <button
-        v-for="format in convertFormats"
-        class="btn btn-primary"
-        v-on:click="
-          async () => {
-            await convertProxiesTo(format);
-          }
-        "
-      >
-        {{ format.toUpperCase() }}
-      </button>
+      <div class="actions">
+        <button
+          v-for="format in convertFormats"
+          :key="format"
+          class="btn"
+          :disabled="isLoading"
+          @click="convertProxiesTo(format)"
+        >
+          {{ isLoading ? "Converting..." : format.toUpperCase() }}
+        </button>
+      </div>
+
+      <label class="label">Result</label>
+      <textarea :value="convertedProxies" class="surface" placeholder="result..." readonly></textarea>
+
+      <button class="btn ghost" @click="copyToClipboard">Copy to Clipboard</button>
     </div>
-
-    <fieldset class="fieldset w-[80%] lg:w-[50%]">
-      <legend class="fieldset-legend mb-2">Result</legend>
-      <textarea
-        :value="convertedProxies"
-        class="textarea textarea-primary w-full overflow-scroll"
-        placeholder="vless://....."
-        disabled
-      ></textarea>
-    </fieldset>
-
-    <div>
-      <button class="btn btn-primary" v-on:click="copyToClipboard">Copy to Clipboard</button>
-    </div>
-  </div>
+  </section>
 </template>
+
+<style scoped>
+.tool-shell {
+  display: grid;
+  gap: 1rem;
+  animation: reveal 0.45s ease both;
+}
+
+.tool-head h1 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+}
+
+.tool-head p {
+  color: var(--text-soft);
+}
+
+.tool-card {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: rgba(16, 21, 36, 0.82);
+  padding: 1rem;
+}
+
+.label {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.surface {
+  min-height: 170px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: rgba(9, 11, 18, 0.88);
+  color: var(--text-main);
+  padding: 0.75rem;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.btn {
+  border: 1px solid rgba(79, 140, 255, 0.45);
+  border-radius: 0.7rem;
+  background: rgba(79, 140, 255, 0.18);
+  color: var(--text-main);
+  padding: 0.5rem 0.95rem;
+  transition: 0.2s ease;
+}
+
+.btn:hover {
+  border-color: rgba(79, 140, 255, 0.82);
+  transform: translateY(-1px);
+}
+
+.btn.ghost {
+  background: transparent;
+  border-color: var(--line);
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

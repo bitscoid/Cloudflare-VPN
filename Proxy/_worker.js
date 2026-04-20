@@ -15,17 +15,16 @@ const v2 = "djJyYXk=";
 
 const PORTS = [443, 80];
 const PROTOCOLS = [atob(horse), atob(flash), atob(neko), "ss"];
-const SUB_PAGE_URL = "https://foolvpn.web.id/nautica";
-const KV_PRX_URL = "https://raw.githubusercontent.com/FoolVPN-ID/Nautica/refs/heads/main/kvProxyList.json";
-const PRX_BANK_URL = "https://raw.githubusercontent.com/FoolVPN-ID/Nautica/refs/heads/main/proxyList.txt";
+const SUB_PAGE_URL = "https://bits-vpn.bits.co.id/vpn";
+const KV_PRX_URL = "https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/main/Proxy/kvProxyList.json";
+const PRX_BANK_URL = "https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/main/Proxy/proxyList.txt";
 const DNS_SERVER_ADDRESS = "8.8.8.8";
 const DNS_SERVER_PORT = 53;
 const RELAY_SERVER_UDP = {
   host: "udp-relay.hobihaus.space", // Kontribusi atau cek relay publik disini: https://hub.docker.com/r/kelvinzer0/udp-relay
   port: 7300,
 };
-const PRX_HEALTH_CHECK_API = "https://id1.foolvpn.web.id/api/v1/check";
-const CONVERTER_URL = "https://api.foolvpn.web.id/convert";
+const PRX_HEALTH_CHECK_API = "";
 const WS_READY_STATE_OPEN = 1;
 const WS_READY_STATE_CLOSING = 2;
 const CORS_HEADER_OPTIONS = {
@@ -113,6 +112,253 @@ async function reverseWeb(request, target, targetPath) {
   return newResponse;
 }
 
+function decodeURIComponentSafe(value = "") {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function yamlQuote(value = "") {
+  return `"${String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function parsePluginOptions(pluginRaw = "") {
+  const [pluginName = "", ...segments] = pluginRaw.split(";");
+  const options = {};
+
+  for (const segment of segments) {
+    if (!segment) continue;
+
+    const [key, ...rest] = segment.split("=");
+    if (!key) continue;
+    options[key] = rest.length ? rest.join("=") : true;
+  }
+
+  return {
+    pluginName,
+    options,
+  };
+}
+
+function parseRawProxy(rawUrl, index) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+
+  const protocol = parsed.protocol.replace(":", "");
+  const name = decodeURIComponentSafe(parsed.hash?.slice(1) || `${protocol.toUpperCase()}-${index + 1}`);
+  const base = {
+    name,
+    server: parsed.hostname,
+    port: Number.parseInt(parsed.port || "443"),
+    network: parsed.searchParams.get("type") || "tcp",
+    path: parsed.searchParams.get("path") || "/",
+    host: parsed.searchParams.get("host") || "",
+    sni: parsed.searchParams.get("sni") || "",
+    tls: parsed.searchParams.get("security") === "tls",
+  };
+
+  if (protocol === "trojan") {
+    return {
+      ...base,
+      type: "trojan",
+      password: decodeURIComponentSafe(parsed.username),
+    };
+  }
+
+  if (protocol === "vless") {
+    return {
+      ...base,
+      type: "vless",
+      uuid: decodeURIComponentSafe(parsed.username),
+      cipher: parsed.searchParams.get("encryption") || "none",
+    };
+  }
+
+  if (protocol === "ss") {
+    const encoded = decodeURIComponentSafe(parsed.username);
+    let method = "none";
+    let password = "";
+
+    try {
+      const decoded = atob(encoded);
+      const separator = decoded.indexOf(":");
+      if (separator >= 0) {
+        method = decoded.slice(0, separator);
+        password = decoded.slice(separator + 1);
+      } else {
+        password = decoded;
+      }
+    } catch {
+      password = encoded;
+    }
+
+    const pluginRaw = decodeURIComponentSafe(parsed.searchParams.get("plugin") || "");
+    const { pluginName, options } = parsePluginOptions(pluginRaw);
+
+    return {
+      ...base,
+      type: "ss",
+      method,
+      password,
+      pluginName,
+      pluginOptions: options,
+    };
+  }
+
+  return null;
+}
+
+function buildClashConfig(rawUrls = "") {
+  const entries = rawUrls
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const proxies = entries
+    .map((entry, index) => parseRawProxy(entry, index))
+    .filter((entry) => entry && entry.server && entry.port);
+
+  if (!proxies.length) {
+    throw new Error("configs not found");
+  }
+
+  const lines = ["mixed-port: 7890", "allow-lan: false", "mode: rule", "log-level: info", "", "proxies:"];
+
+  for (const proxy of proxies) {
+    lines.push(`  - name: ${yamlQuote(proxy.name)}`);
+    lines.push(`    type: ${proxy.type}`);
+    lines.push(`    server: ${proxy.server}`);
+    lines.push(`    port: ${proxy.port}`);
+
+    if (proxy.type === "trojan") {
+      lines.push(`    password: ${yamlQuote(proxy.password)}`);
+    }
+
+    if (proxy.type === "vless") {
+      lines.push(`    uuid: ${yamlQuote(proxy.uuid)}`);
+      lines.push(`    cipher: ${yamlQuote(proxy.cipher)}`);
+    }
+
+    if (proxy.type === "ss") {
+      lines.push(`    cipher: ${yamlQuote(proxy.method)}`);
+      lines.push(`    password: ${yamlQuote(proxy.password)}`);
+      if (proxy.pluginName) {
+        lines.push(`    plugin: ${yamlQuote(proxy.pluginName)}`);
+      }
+      const pluginOptionKeys = Object.keys(proxy.pluginOptions || {});
+      if (pluginOptionKeys.length) {
+        lines.push("    plugin-opts:");
+        for (const optionKey of pluginOptionKeys) {
+          lines.push(`      ${optionKey}: ${yamlQuote(proxy.pluginOptions[optionKey])}`);
+        }
+      }
+    }
+
+    lines.push(`    udp: true`);
+
+    if (proxy.network === "ws") {
+      lines.push("    network: ws");
+      if (proxy.tls) {
+        lines.push("    tls: true");
+      }
+      if (proxy.sni) {
+        lines.push(`    servername: ${yamlQuote(proxy.sni)}`);
+      }
+      lines.push("    ws-opts:");
+      lines.push(`      path: ${yamlQuote(proxy.path || "/")}`);
+      if (proxy.host) {
+        lines.push("      headers:");
+        lines.push(`        Host: ${yamlQuote(proxy.host)}`);
+      }
+    }
+  }
+
+  lines.push("", "proxy-groups:", `  - name: ${yamlQuote("Auto")}`, "    type: select", "    proxies:");
+  for (const proxy of proxies) {
+    lines.push(`      - ${yamlQuote(proxy.name)}`);
+  }
+
+  lines.push("", "rules:", "  - MATCH,Auto");
+  return lines.join("\n");
+}
+
+function buildClashProviderConfig(rawUrls = "") {
+  const entries = rawUrls
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const proxies = entries
+    .map((entry, index) => parseRawProxy(entry, index))
+    .filter((entry) => entry && entry.server && entry.port);
+
+  if (!proxies.length) {
+    throw new Error("configs not found");
+  }
+
+  const lines = ["proxies:"];
+
+  for (const proxy of proxies) {
+    lines.push(`  - name: ${yamlQuote(proxy.name)}`);
+    lines.push(`    server: ${yamlQuote(proxy.server)}`);
+    lines.push(`    port: ${proxy.port}`);
+    lines.push(`    type: ${proxy.type}`);
+
+    if (proxy.type === "trojan") {
+      lines.push(`    password: ${yamlQuote(proxy.password)}`);
+    }
+
+    if (proxy.type === "vless") {
+      lines.push(`    uuid: ${yamlQuote(proxy.uuid)}`);
+      lines.push(`    cipher: auto`);
+    }
+
+    if (proxy.type === "ss") {
+      lines.push(`    cipher: ${yamlQuote(proxy.method)}`);
+      lines.push(`    password: ${yamlQuote(proxy.password)}`);
+      if (proxy.pluginName) {
+        lines.push(`    plugin: ${yamlQuote(proxy.pluginName)}`);
+      }
+      const pluginOptionKeys = Object.keys(proxy.pluginOptions || {});
+      if (pluginOptionKeys.length) {
+        lines.push("    plugin-opts:");
+        for (const optionKey of pluginOptionKeys) {
+          lines.push(`      ${optionKey}: ${yamlQuote(proxy.pluginOptions[optionKey])}`);
+        }
+      }
+    }
+
+    if (proxy.tls) {
+      lines.push("    tls: true");
+      lines.push("    skip-cert-verify: true");
+    }
+
+    if (proxy.sni) {
+      lines.push(`    servername: ${yamlQuote(proxy.sni)}`);
+    }
+
+    if (proxy.network === "ws") {
+      lines.push("    network: ws");
+      lines.push("    ws-opts:");
+      lines.push(`      path: ${yamlQuote(proxy.path || "/")}`);
+      if (proxy.host) {
+        lines.push("      headers:");
+        lines.push(`        Host: ${yamlQuote(proxy.host)}`);
+      }
+    }
+
+    lines.push("    udp: true");
+  }
+
+  return lines.join("\n");
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -141,6 +387,69 @@ export default {
         }
       }
 
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            ...CORS_HEADER_OPTIONS,
+          },
+        });
+      }
+
+      if (url.pathname.startsWith("/convert")) {
+        if (request.method !== "POST") {
+          return new Response("Method Not Allowed", {
+            status: 405,
+            headers: {
+              ...CORS_HEADER_OPTIONS,
+            },
+          });
+        }
+
+        const payload = await request.json().catch(() => null);
+        if (!payload || typeof payload !== "object") {
+          return new Response("Invalid JSON body", {
+            status: 400,
+            headers: {
+              ...CORS_HEADER_OPTIONS,
+            },
+          });
+        }
+
+        const format = String(payload.format || "clash").toLowerCase();
+        if (format !== "clash" && format !== "mihomo" && format !== "provider" && format !== "clash-provider") {
+          return new Response("Supported formats: clash, mihomo, provider", {
+            status: 400,
+            headers: {
+              ...CORS_HEADER_OPTIONS,
+            },
+          });
+        }
+
+        const rawUrls = String(payload.url || "").trim();
+        if (!rawUrls) {
+          return new Response("configs not found", {
+            status: 400,
+            headers: {
+              ...CORS_HEADER_OPTIONS,
+            },
+          });
+        }
+
+        const clashConfig =
+          format === "provider" || format === "clash-provider"
+            ? buildClashProviderConfig(rawUrls)
+            : buildClashConfig(rawUrls);
+
+        return new Response(clashConfig, {
+          status: 200,
+          headers: {
+            ...CORS_HEADER_OPTIONS,
+            "Content-Type": "text/yaml;charset=UTF-8",
+          },
+        });
+      }
+
       if (url.pathname.startsWith("/sub")) {
         return Response.redirect(SUB_PAGE_URL + `?host=${APP_DOMAIN}`, 301);
       } else if (url.pathname.startsWith("/check")) {
@@ -164,6 +473,7 @@ export default {
           const filterLimit = parseInt(url.searchParams.get("limit")) || 10;
           const filterFormat = url.searchParams.get("format") || "raw";
           const fillerDomain = url.searchParams.get("domain") || APP_DOMAIN;
+          const providerServer = url.searchParams.get("provider-server") || "support.zoom.us";
 
           const prxBankUrl = url.searchParams.get("prx-list") || env.PRX_BANK_URL;
           const prxList = await getPrxList(prxBankUrl)
@@ -182,11 +492,12 @@ export default {
 
           const uuid = crypto.randomUUID();
           const result = [];
+          const isProviderFormat = filterFormat === "provider" || filterFormat === "clash-provider";
           for (const prx of prxList) {
             const uri = new URL(`${atob(horse)}://${fillerDomain}`);
             uri.searchParams.set("encryption", "none");
             uri.searchParams.set("type", "ws");
-            uri.searchParams.set("host", APP_DOMAIN);
+            uri.searchParams.set("host", fillerDomain);
 
             for (const port of filterPort) {
               for (const protocol of filterVPN) {
@@ -194,20 +505,21 @@ export default {
 
                 uri.protocol = protocol;
                 uri.port = port.toString();
+                uri.hostname = isProviderFormat ? providerServer : fillerDomain;
                 if (protocol == "ss") {
                   uri.username = btoa(`none:${uuid}`);
                   uri.searchParams.set(
                     "plugin",
                     `${atob(v2)}-plugin${port == 80 ? "" : ";tls"};mux=0;mode=websocket;path=/${prx.prxIP}-${
                       prx.prxPort
-                    };host=${APP_DOMAIN}`,
+                    };host=${fillerDomain}`,
                   );
                 } else {
                   uri.username = uuid;
                 }
 
                 uri.searchParams.set("security", port == 443 ? "tls" : "none");
-                uri.searchParams.set("sni", port == 80 && protocol == atob(flash) ? "" : APP_DOMAIN);
+                uri.searchParams.set("sni", port == 80 && protocol == atob(flash) ? "" : fillerDomain);
                 uri.searchParams.set("path", `/${prx.prxIP}-${prx.prxPort}`);
 
                 uri.hash = `${result.length + 1} ${getFlagEmoji(prx.country)} ${prx.org} WS ${
@@ -223,31 +535,26 @@ export default {
             case "raw":
               finalResult = result.join("\n");
               break;
+            case "clash":
+            case "mihomo":
+              finalResult = buildClashConfig(result.join(","));
+              break;
+            case "provider":
+            case "clash-provider":
+              finalResult = buildClashProviderConfig(result.join(","));
+              break;
             case atob(v2):
               finalResult = btoa(result.join("\n"));
               break;
             case atob(neko):
             case "sfa":
             case "bfr":
-              const res = await fetch(CONVERTER_URL, {
-                method: "POST",
-                body: JSON.stringify({
-                  url: result.join(","),
-                  format: filterFormat,
-                  template: "cf",
-                }),
+              return new Response("Only clash format is supported", {
+                status: 400,
+                headers: {
+                  ...CORS_HEADER_OPTIONS,
+                },
               });
-              if (res.status == 200) {
-                finalResult = await res.text();
-              } else {
-                return new Response(res.statusText, {
-                  status: res.status,
-                  headers: {
-                    ...CORS_HEADER_OPTIONS,
-                  },
-                });
-              }
-              break;
           }
 
           return new Response(finalResult, {
@@ -256,6 +563,175 @@ export default {
               ...CORS_HEADER_OPTIONS,
             },
           });
+        } else if (apiPath.startsWith("/check")) {
+          const targetQuery = url.searchParams.get("target") || url.searchParams.get("ip") || url.searchParams.get("") || "";
+          const target = targetQuery.split(":");
+          if (!target[0]) {
+            return new Response("Missing target or ip query", {
+              status: 400,
+              headers: {
+                ...CORS_HEADER_OPTIONS,
+              },
+            });
+          }
+
+          const result = await checkPrxHealth(target[0], target[1] || "443");
+          const cfData = request.cf || {};
+          const responseData = {
+            proxy: result.result?.proxy || target[0],
+            port: parseInt(result.result?.port || target[1] || "443"),
+            proxyip: result.result?.proxyip || false,
+            delay: result.result?.delay || 0,
+            ip: target[0],
+            colo: request.headers.get("cf-ray")?.split("-")[1] || "",
+            longitude: cfData.longitude || "",
+            httpProtocol: request.headers.get("httpProtocol") || "HTTP/2",
+            continent: cfData.continent || "",
+            asn: cfData.asn || 0,
+            country: cfData.country || "",
+            tlsVersion: "",
+            city: cfData.city || "",
+            timezone: cfData.timezone || "",
+            postalCode: cfData.postalCode || "",
+            region: cfData.region || "",
+            latitude: cfData.latitude || "",
+            regionCode: cfData.regionCode || "",
+            asOrganization: cfData.asOrganization || "",
+            ...(result.error ? { error: result.error, message: result.message } : {}),
+          };
+          return new Response(JSON.stringify(responseData), {
+            status: 200,
+            headers: {
+              ...CORS_HEADER_OPTIONS,
+              "Content-Type": "application/json",
+            },
+          });
+        } else if (apiPath.startsWith("/ping")) {
+          return new Response("pong", {
+            status: 200,
+            headers: {
+              ...CORS_HEADER_OPTIONS,
+            },
+          });
+        } else if (apiPath.startsWith("/info")) {
+          const cfData = request.cf || {};
+          const clientIP =
+            request.headers.get("cf-connecting-ipv6") ||
+            request.headers.get("cf-connecting-ip") ||
+            request.headers.get("x-real-ip") ||
+            "";
+          return new Response(
+            JSON.stringify({
+              ip: clientIP,
+              country_name: cfData.country || "Unknown",
+              country: cfData.country || "UN",
+              region: cfData.continent || "Unknown",
+              org: cfData.asOrganization || "Cloudflare Workers",
+            }),
+            {
+              status: 200,
+              headers: {
+                ...CORS_HEADER_OPTIONS,
+                "Content-Type": "application/json",
+              },
+            },
+          );
+        } else if (apiPath.startsWith("/status")) {
+          const now = Date.now();
+          return new Response(
+            JSON.stringify({
+              cpu: [Math.random() * 10],
+              host: {
+                hostname: "workers",
+                uptime: Math.floor(now / 1000),
+                bootTime: 0,
+                procs: 1,
+                os: "cloudflare",
+                platform: "workers",
+                platformFamily: "workers",
+                platformVersion: "1.0",
+                kernelVersion: "workerd",
+                kernelArch: "x86_64",
+                virtualizationSystem: "cloudflare",
+                virtualizationRole: "guest",
+                hostId: "workers",
+              },
+              mem: {
+                total: 134217728,
+                available: 67108864,
+                used: 67108864,
+                usedPercent: 50,
+                free: 67108864,
+                active: 33554432,
+                inactive: 33554432,
+                wired: 0,
+                laundry: 0,
+                buffers: 0,
+                cached: 0,
+                writeBack: 0,
+                dirty: 0,
+                writeBackTmp: 0,
+                shared: 0,
+                slab: 0,
+                sreclaimable: 0,
+                sunreclaim: 0,
+                pageTables: 0,
+                swapCached: 0,
+                commitLimit: 0,
+                committedAS: 0,
+                highTotal: 0,
+                highFree: 0,
+                lowTotal: 0,
+                lowFree: 0,
+                swapTotal: 0,
+                swapFree: 0,
+                mapped: 0,
+                vmallocTotal: 0,
+                vmallocUsed: 0,
+                vmallocChunk: 0,
+                hugePagesTotal: 0,
+                hugePagesFree: 0,
+                hugePagesRsvd: 0,
+                hugePagesSurp: 0,
+                hugePageSize: 0,
+                anonHugePages: 0,
+              },
+              disk: {
+                path: "/",
+                fstype: "tmpfs",
+                total: 0,
+                free: 0,
+                used: 0,
+                usedPercent: 0,
+                inodesTotal: 0,
+                inodesUsed: 0,
+                inodesFree: 0,
+                inodesUsedPercent: 0,
+              },
+              nic: [
+                {
+                  name: "all",
+                  bytesSent: now,
+                  bytesRecv: now,
+                  packetsSent: 0,
+                  packetsRecv: 0,
+                  errin: 0,
+                  errout: 0,
+                  dropin: 0,
+                  dropout: 0,
+                  fifoin: 0,
+                  fifoout: 0,
+                },
+              ],
+            }),
+            {
+              status: 200,
+              headers: {
+                ...CORS_HEADER_OPTIONS,
+                "Content-Type": "application/json",
+              },
+            },
+          );
         } else if (apiPath.startsWith("/myip")) {
           return new Response(
             JSON.stringify({
@@ -275,7 +751,7 @@ export default {
         }
       }
 
-      const targetReversePrx = env.REVERSE_PRX_TARGET || "example.com";
+      const targetReversePrx = env.REVERSE_PRX_TARGET || "bits-vpn.bits.co.id";
       return await reverseWeb(request, targetReversePrx);
     } catch (err) {
       return new Response(`An error occurred: ${err.toString()}`, {
@@ -1118,8 +1594,43 @@ function safeCloseWebSocket(socket) {
 }
 
 async function checkPrxHealth(prxIP, prxPort) {
-  const req = await fetch(`${PRX_HEALTH_CHECK_API}?ip=${prxIP}:${prxPort}`);
-  return await req.json();
+  const start = Date.now();
+  const parsedPort = Number.parseInt(String(prxPort || ""), 10);
+  const tlsPorts = new Set([443, 8443, 2053, 2083, 2087, 2096]);
+  const scheme = tlsPorts.has(parsedPort) ? "https" : "http";
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+    await fetch(`${scheme}://${prxIP}:${prxPort}`, {
+      method: "HEAD",
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    return {
+      error: false,
+      result: {
+        proxy: prxIP,
+        port: prxPort,
+        proxyip: true,
+        delay: Date.now() - start,
+      },
+    };
+  } catch (err) {
+    const timeoutMs = 2000;
+    const measured = Date.now() - start;
+    return {
+      error: true,
+      message: err?.message || "failed",
+      result: {
+        proxy: prxIP,
+        port: prxPort,
+        proxyip: false,
+        delay: measured >= timeoutMs ? timeoutMs : 0,
+      },
+    };
+  }
 }
 
 // Helpers
