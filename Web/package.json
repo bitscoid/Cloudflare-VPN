@@ -1,0 +1,25 @@
+{
+  "name": "nuxt-app",
+  "dependencies": {
+    "nuxt": "^3.16.2",
+    "pretty-bytes": "^6.1.1",
+    "vue": "latest",
+    "vue-router": "latest"
+  },
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@nuxt/icon": "^1.11.0",
+    "@nuxtjs/tailwindcss": "^6.13.2",
+    "@pinia/nuxt": "^0.10.1",
+    "daisyui": "^4.12.24",
+    "wrangler": "^4.83.0"
+  }
+}

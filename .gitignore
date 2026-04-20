@@ -1,0 +1,29 @@
+.DS_Store
+.idea/
+.vscode/
+*.log
+logs/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Root dependencies/cache
+node_modules/
+.cache/
+
+# Web app artifacts
+Web/node_modules/
+Web/.nuxt/
+Web/.output/
+Web/.wrangler/
+Web/dist/
+Web/.data/
+Web/.nitro/
+
+# Proxy app artifacts
+Proxy/node_modules/
+Proxy/.wrangler/
+Proxy/.cache/
+Proxy/coverage/
