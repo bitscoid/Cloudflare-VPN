@@ -62,7 +62,7 @@ watch(selectedProxies.getSelectedProxies, () => {
     </button>
 
     <button class="ping" type="button" @click="!stats.loading && checkProxyHealth()">
-      <span v-if="stats.loading" class="loading loading-spinner loading-xs"></span>
+      <span v-if="stats.loading" class="spinner" aria-hidden="true"></span>
       <span v-else>{{ stats.delay ? `${stats.delay} ms` : "timeout" }}</span>
       <span class="state" :class="stats.proxyip ? 'ok' : 'bad'"></span>
     </button>
@@ -139,5 +139,20 @@ watch(selectedProxies.getSelectedProxies, () => {
 .state.bad {
   background: #ff6b87;
   box-shadow: 0 0 10px rgba(255, 107, 135, 0.45);
+}
+
+.spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  border-top-color: rgba(148, 163, 184, 0.9);
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

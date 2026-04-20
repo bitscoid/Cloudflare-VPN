@@ -2,9 +2,9 @@
 const route = useRoute();
 
 const routerPaths = [
-  { name: "Build", path: "/vpn", icon: "uil:wrench" },
-  { name: "Convert", path: "/tools/converter", icon: "uil:sync" },
-  { name: "Monitor", path: "/uptime", icon: "uil:chart-line" },
+  { name: "Build", path: "/build", icon: "uil:wrench" },
+  { name: "Convert", path: "/convert", icon: "uil:sync" },
+  { name: "Monitor", path: "/monitor", icon: "uil:chart-line" },
 ];
 
 const isOpen = ref(false);
@@ -19,7 +19,7 @@ const isOpen = ref(false);
         </span>
         <span class="brand-copy">
           <strong>BITS VPN</strong>
-          <small>Cloudflare Edge</small>
+          <small>Always Connected</small>
         </span>
       </NuxtLink>
 
@@ -101,6 +101,7 @@ const isOpen = ref(false);
   display: flex;
   flex-direction: column;
   line-height: 1;
+  margin-left: 10px;
 }
 
 .brand-copy strong {

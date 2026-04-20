@@ -22,8 +22,8 @@ const page = ref(0);
 const itemPerPage = ref(18);
 const pagination = ref([0, 1, 2]);
 const displaySelected = ref(false);
-const openToast = ref(false);
-const toastText = ref("");
+const isNoticeOpen = ref(false);
+const noticeText = ref("");
 const search = ref("");
 
 const proxySettings = reactive<ProxySettings>({
@@ -99,9 +99,9 @@ watch([page, proxies, selectedCountry, displaySelected, search], () => {
   setPagination();
 });
 
-watch([openToast], () => {
+watch([isNoticeOpen], () => {
   setTimeout(() => {
-    openToast.value = false;
+    isNoticeOpen.value = false;
   }, 2600);
 });
 
@@ -138,8 +138,8 @@ useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/m
 </script>
 
 <template>
-  <dialog id="settings_modal" class="modal">
-    <div class="modal-box settings-card">
+  <dialog id="settings_dialog" class="settings-dialog">
+    <div class="settings-card">
       <h3>Profile Settings</h3>
       <p>Tune server profile before export.</p>
 
@@ -176,9 +176,9 @@ useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/m
 
       <div class="preview">Effective host: <strong>{{ activeHost }}</strong></div>
 
-      <div class="modal-action">
+      <div class="settings-actions">
         <form method="dialog">
-          <button class="action-btn">Done</button>
+          <button class="panel-button">Done</button>
         </form>
       </div>
     </div>
@@ -186,11 +186,10 @@ useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/m
 
   <section class="vpn-shell">
     <div class="header-row">
-      <div>
-        <p class="kicker">Build</p>
-        <h1>Build</h1>
-      </div>
-      <div class="chip">{{ selectedProxies.getSelectedProxies.length }} selected</div>
+      <h1 class="view-title">
+        <span class="view-icon"><Icon name="uil:wrench" size="14" /></span>
+        <span>Build</span>
+      </h1>
     </div>
 
     <div class="panel-grid">
@@ -232,21 +231,21 @@ useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/m
         </CardWithSlot>
 
         <CardWithSlot icon="list-ul">
-          <button class="action-btn" @click="displaySelected = !displaySelected">
+          <button class="panel-button" @click="displaySelected = !displaySelected">
             {{ displaySelected ? "Show All" : "Only Selected" }}
           </button>
         </CardWithSlot>
 
         <CardWithSlot icon="cog">
           <div class="stack">
-            <button class="action-btn" onclick="settings_modal.showModal()">Settings</button>
+            <button class="panel-button" onclick="settings_dialog.showModal()">Settings</button>
             <button
-              class="action-btn"
+              class="panel-button"
               @click="
                 async () => {
                   await copyToClipboard();
-                  openToast = true;
-                  toastText = 'Proxy copied to clipboard!';
+                  isNoticeOpen = true;
+                  noticeText = 'Proxy copied to clipboard!';
                 }
               "
             >
@@ -258,20 +257,20 @@ useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/m
     </div>
 
     <div class="pager">
-      <button class="pager-btn" @click="page--">&lt;</button>
+      <button class="pager-control" @click="page--">&lt;</button>
       <button
         v-for="pageIndex in pagination"
         :key="pageIndex"
-        class="pager-btn"
+        class="pager-control"
         :class="pageIndex == page ? 'active' : ''"
         @click="page = pageIndex"
       >
         {{ pageIndex }}
       </button>
-      <button class="pager-btn" @click="page++">&gt;</button>
+      <button class="pager-control" @click="page++">&gt;</button>
     </div>
 
-    <div v-if="openToast" class="toast-box">{{ toastText }}</div>
+    <div v-if="isNoticeOpen" class="notice-chip">{{ noticeText }}</div>
   </section>
 </template>
 
@@ -283,31 +282,33 @@ useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/m
 }
 
 .header-row {
+  width: 100%;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 0.8rem;
+  justify-content: center;
+  align-items: center;
+  margin: 0.5rem 0 0.9rem;
 }
 
-.kicker {
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-h1 {
+.view-title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
   font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(1.4rem, 2.7vw, 2rem);
+  font-size: clamp(1.15rem, 2.3vw, 1.45rem);
+  letter-spacing: 0.01em;
 }
 
-.chip {
-  border: 1px solid rgba(79, 140, 255, 0.35);
-  background: rgba(79, 140, 255, 0.12);
-  border-radius: 9999px;
-  padding: 0.3rem 0.68rem;
-  font-size: 0.78rem;
+.view-icon {
+  width: 1.58rem;
+  height: 1.58rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(79, 140, 255, 0.42);
+  background: linear-gradient(145deg, rgba(79, 140, 255, 0.3), rgba(79, 140, 255, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2);
+  color: #cfe0ff;
+  display: grid;
+  place-items: center;
 }
 
 .panel-grid {
@@ -347,7 +348,7 @@ h1 {
   padding: 0.5rem 0.65rem;
 }
 
-.action-btn {
+.panel-button {
   border: 1px solid rgba(79, 140, 255, 0.45);
   border-radius: 0.7rem;
   background: rgba(79, 140, 255, 0.16);
@@ -356,7 +357,7 @@ h1 {
   transition: 0.2s ease;
 }
 
-.action-btn:hover {
+.panel-button:hover {
   border-color: rgba(79, 140, 255, 0.82);
 }
 
@@ -366,7 +367,7 @@ h1 {
   gap: 0.5rem;
 }
 
-.pager-btn {
+.pager-control {
   min-width: 36px;
   border: 1px solid var(--line);
   border-radius: 0.62rem;
@@ -374,12 +375,12 @@ h1 {
   padding: 0.3rem 0.6rem;
 }
 
-.pager-btn.active {
+.pager-control.active {
   border-color: rgba(79, 140, 255, 0.85);
   background: rgba(79, 140, 255, 0.15);
 }
 
-.toast-box {
+.notice-chip {
   position: fixed;
   right: 1rem;
   bottom: 1rem;
@@ -392,6 +393,28 @@ h1 {
 .settings-card {
   border: 1px solid var(--line);
   background: rgba(12, 17, 30, 0.98);
+  border-radius: 0.95rem;
+  padding: 1rem;
+}
+
+.settings-dialog {
+  border: none;
+  border-radius: 0.95rem;
+  padding: 0;
+  width: min(740px, 92vw);
+  max-height: min(84vh, 760px);
+  background: transparent;
+}
+
+.settings-dialog::backdrop {
+  background: rgba(8, 11, 20, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.settings-actions {
+  margin-top: 0.8rem;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .settings-card h3 {

@@ -160,7 +160,10 @@ onMounted(async () => {
 <template>
   <section class="uptime-shell">
     <div class="head-row">
-      <h1><Icon name="uil:chart-line" size="18" /> Monitor</h1>
+      <h1 class="view-title">
+        <span class="view-icon"><Icon name="uil:chart-line" size="14" /></span>
+        <span>Monitor</span>
+      </h1>
       <div class="head-pills">
         <span class="refresh-pill"><Icon name="uil:history" size="13" /> {{ refreshInterval }}s</span>
         <span class="refresh-pill"><Icon name="uil:server-network" size="13" /> {{ serverList.length }}</span>
@@ -170,28 +173,21 @@ onMounted(async () => {
     <Card v-for="(server, idx) in serverList" :key="server.url">
       <div class="monitor-row" :style="{ animationDelay: `${idx * 0.1}s` }">
         <div class="endpoint-cell">
-          <div class="endpoint-pill"><Icon name="uil:server-network" size="14" /> {{ server.url }}</div>
-          <small class="provider-copy"><Icon name="uil:building" size="12" /> {{ server.info.org || "Loading provider..." }}</small>
+          <div class="endpoint-provider-row">
+            <div class="endpoint-pill"><Icon name="uil:server-network" size="14" /> <span class="endpoint-name">{{ server.url }}</span></div>
+            <div class="provider-pill"><Icon name="uil:building" size="12" /> <span class="provider-name">{{ server.info.org || "Loading provider..." }}</span></div>
+          </div>
         </div>
 
         <div class="metric-cluster">
+          <div class="mini-pill"><Icon name="uil:processor" size="12" /> {{ cpuLabel(server) }}</div>
+          <div class="mini-pill"><Icon name="uil:database" size="12" /> {{ ramLabel(server) }}</div>
+          <div class="mini-pill"><Icon name="uil:upload" size="12" /> {{ speedLabel(server.speed.upload) }}</div>
+          <div class="mini-pill"><Icon name="uil:download-alt" size="12" /> {{ speedLabel(server.speed.download) }}</div>
           <div class="mini-pill ping-pill" :class="pingStateClass(server)">
             <span class="dot"></span>
             <Icon name="uil:wifi" size="12" /> {{ pingLabel(server) }}
           </div>
-          <div class="mini-pill"><Icon name="uil:microchip" size="12" /> {{ cpuLabel(server) }}</div>
-          <div class="mini-pill"><Icon name="uil:database" size="12" /> {{ ramLabel(server) }}</div>
-          <div class="mini-pill"><Icon name="uil:upload" size="12" /> {{ speedLabel(server.speed.upload) }}</div>
-          <div class="mini-pill"><Icon name="uil:download-alt" size="12" /> {{ speedLabel(server.speed.download) }}</div>
-        </div>
-
-        <div class="sparkline compact">
-          <div
-            v-for="(pingData, index) in server.ping"
-            :key="index"
-            class="bar"
-            :style="{ height: `${Math.max(12, Math.min(100, pingData.delay))}%`, animationDelay: `${index * 0.03}s` }"
-          ></div>
         </div>
 
         <div v-if="server.errors.length" class="error-pill">
@@ -205,30 +201,51 @@ onMounted(async () => {
 <style scoped>
 .uptime-shell {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0.62rem;
+  height: 100%;
+  overflow: hidden;
+  padding-top: 0.7rem;
   animation: reveal 0.5s ease both;
 }
 
 .head-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   gap: 0.6rem;
+  margin: 0.5rem 0 0.9rem;
+  position: relative;
 }
 
-.head-row h1 {
+.view-title {
   margin: 0;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.42rem;
   font-family: "Space Grotesk", sans-serif;
   font-size: clamp(1.15rem, 2.3vw, 1.45rem);
+  letter-spacing: 0.01em;
+}
+
+.view-icon {
+  width: 1.58rem;
+  height: 1.58rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(79, 140, 255, 0.42);
+  background: linear-gradient(145deg, rgba(79, 140, 255, 0.3), rgba(79, 140, 255, 0.1));
+  box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2);
+  color: #cfe0ff;
+  display: grid;
+  place-items: center;
 }
 
 .head-pills {
   display: inline-flex;
   align-items: center;
   gap: 0.32rem;
+  position: absolute;
+  right: 0;
 }
 
 .refresh-pill {
@@ -246,15 +263,25 @@ onMounted(async () => {
 .monitor-row {
   padding: 0.65rem 0.72rem;
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) minmax(320px, 1.8fr) minmax(120px, 1fr);
+  grid-template-columns: minmax(200px, 1.2fr) minmax(420px, 2.2fr);
   align-items: center;
   gap: 0.45rem;
+  min-width: 0;
   animation: fadeUp 0.5s ease both;
 }
 
 .endpoint-cell {
-  display: grid;
-  gap: 0.24rem;
+  min-width: 0;
+}
+
+.endpoint-provider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .endpoint-pill {
@@ -263,23 +290,47 @@ onMounted(async () => {
   gap: 0.28rem;
   border-radius: 9999px;
   font-size: 0.76rem;
-  border: 1px solid var(--line);
-  padding: 0.24rem 0.5rem;
-  background: rgba(9, 11, 18, 0.58);
-  width: fit-content;
+  border: 1px solid rgba(79, 140, 255, 0.42);
+  padding: 0.25rem 0.56rem;
+  background: linear-gradient(145deg, rgba(79, 140, 255, 0.24), rgba(79, 140, 255, 0.08));
+  box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.18);
+  min-width: 0;
+  max-width: 54%;
+  flex: 0 1 auto;
 }
 
-.provider-copy {
-  color: var(--text-soft);
+.provider-pill {
+  border: 1px solid rgba(96, 235, 190, 0.3);
+  border-radius: 9999px;
+  padding: 0.23rem 0.52rem;
+  background: linear-gradient(145deg, rgba(24, 120, 96, 0.22), rgba(24, 120, 96, 0.08));
+  color: #bcefe2;
   font-size: 0.7rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.22rem;
+  min-width: 0;
+  width: fit-content;
+  max-width: 44%;
+  flex: 0 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.endpoint-name,
+.provider-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metric-cluster {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  min-width: 0;
   gap: 0.3rem;
 }
 
@@ -293,6 +344,8 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   gap: 0.22rem;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .ping-pill {
@@ -341,25 +394,6 @@ onMounted(async () => {
   background: rgba(71, 85, 105, 0.16);
 }
 
-.sparkline {
-  border-radius: 0.62rem;
-  border: 1px solid var(--line);
-  padding: 0.26rem;
-  min-height: 40px;
-  display: flex;
-  align-items: flex-end;
-  gap: 0.12rem;
-  background: rgba(9, 11, 18, 0.7);
-}
-
-.bar {
-  width: 100%;
-  max-width: 7px;
-  border-radius: 0.2rem;
-  background: linear-gradient(to top, #4f8cff, #7eb3ff);
-  animation: rise 0.4s ease both;
-}
-
 .error-pill {
   grid-column: 1 / -1;
   border: 1px solid rgba(255, 99, 132, 0.4);
@@ -378,23 +412,44 @@ onMounted(async () => {
     grid-template-columns: 1fr;
   }
 
-  .sparkline.compact {
-    min-height: 44px;
+  .metric-cluster {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1180px) {
+  .metric-cluster {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }
 
 @media (max-width: 760px) {
   .head-row {
     flex-wrap: wrap;
+    justify-content: center;
+    margin: 0.35rem 0 0.75rem;
   }
 
   .head-pills {
+    position: static;
     width: 100%;
-    justify-content: flex-start;
+    justify-content: center;
+  }
+
+  .endpoint-provider-row {
+    flex-wrap: wrap;
   }
 
   .endpoint-pill,
-  .provider-copy,
+  .provider-pill {
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .endpoint-pill,
+  .provider-pill,
   .mini-pill {
     font-size: 0.69rem;
   }
@@ -419,17 +474,6 @@ onMounted(async () => {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes rise {
-  from {
-    transform: scaleY(0.15);
-    transform-origin: bottom;
-  }
-  to {
-    transform: scaleY(1);
-    transform-origin: bottom;
   }
 }
 
