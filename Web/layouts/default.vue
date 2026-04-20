@@ -15,7 +15,7 @@ const isSinglePage = computed(() => {
 <template>
   <Navbar name="Bits VPN" />
   <div :class="['layout-shell', isSinglePage ? 'single-page-shell' : '']">
-    <main :class="['mx-auto w-[min(1200px,92vw)]', isSinglePage ? 'h-full py-0 overflow-hidden' : 'py-6 md:py-8']">
+    <main :class="['mx-auto w-[min(1200px,92vw)]', isSinglePage ? 'h-full py-0 overflow-hidden' : 'py-6']">
       <slot />
     </main>
   </div>

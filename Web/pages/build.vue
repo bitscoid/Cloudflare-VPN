@@ -28,9 +28,10 @@ const isCountryMenuOpen = ref(false);
 const isProtocolMenuOpen = ref(false);
 const isFormatMenuOpen = ref(false);
 const displayProxies = ref<ProxyItem[]>([]);
-const page = ref(0);
-const itemPerPage = ref(18);
-const pagination = ref([0, 1, 2]);
+const page = ref(1);
+const itemPerPage = ref(10);
+const pagination = ref([1]);
+const totalPages = ref(1);
 const displaySelected = ref(false);
 const isNoticeOpen = ref(false);
 const noticeText = ref("");
@@ -196,9 +197,13 @@ async function copyToClipboard() {
   }
 }
 
+watch([selectedCountry, displaySelected, search], () => {
+  page.value = 1;
+});
+
 watch([page, proxies, selectedCountry, displaySelected, search], () => {
-  setDisplayProxies();
   setPagination();
+  setDisplayProxies();
 });
 
 watch([isNoticeOpen], () => {
@@ -244,26 +249,61 @@ useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/m
 
 function setDisplayProxies() {
   const proxiesTemp = getTempProxies();
-  const startIndex = page.value * itemPerPage.value;
+  const startIndex = (page.value - 1) * itemPerPage.value;
   const endIndex = startIndex + itemPerPage.value;
   displayProxies.value = proxiesTemp.slice(startIndex, endIndex);
 }
 
 function setPagination() {
   const proxiesTemp = getTempProxies();
-  const maxIndex = Math.max(0, Math.ceil(proxiesTemp.length / itemPerPage.value) - 1);
+  const maxPage = Math.max(1, Math.ceil(proxiesTemp.length / itemPerPage.value));
   const maxItem = 5;
-  const paginationTemp = [];
+  const paginationTemp: number[] = [];
 
-  if (page.value < 0) page.value = 0;
-  if (page.value > maxIndex) page.value = maxIndex;
+  totalPages.value = maxPage;
 
-  for (let i = page.value <= 2 ? 0 : page.value + 2 >= maxIndex ? Math.max(0, maxIndex - 4) : page.value - 2; i <= maxIndex; i++) {
+  if (page.value < 1) page.value = 1;
+  if (page.value > maxPage) page.value = maxPage;
+
+  const startPage =
+    page.value <= 3 ? 1 : page.value + 2 >= maxPage ? Math.max(1, maxPage - 4) : page.value - 2;
+
+  for (let i = startPage; i <= maxPage; i++) {
     paginationTemp.push(i);
     if (paginationTemp.length >= maxItem) break;
   }
 
   pagination.value = paginationTemp;
+}
+
+function goToPage(targetPage: number) {
+  if (targetPage < 1) {
+    page.value = 1;
+    return;
+  }
+
+  if (targetPage > totalPages.value) {
+    page.value = totalPages.value;
+    return;
+  }
+
+  page.value = targetPage;
+}
+
+function goToFirstPage() {
+  goToPage(1);
+}
+
+function goToPreviousPage() {
+  goToPage(page.value - 1);
+}
+
+function goToNextPage() {
+  goToPage(page.value + 1);
+}
+
+function goToLastPage() {
+  goToPage(totalPages.value);
 }
 </script>
 
@@ -461,20 +501,26 @@ function setPagination() {
           :country="proxy.country"
         />
       </div>
-    </div>
 
-    <div class="pager">
-      <button class="pager-control" @click="page--">&lt;</button>
-      <button
-        v-for="pageIndex in pagination"
-        :key="pageIndex"
-        class="pager-control"
-        :class="pageIndex == page ? 'active' : ''"
-        @click="page = pageIndex"
-      >
-        {{ pageIndex }}
-      </button>
-      <button class="pager-control" @click="page++">&gt;</button>
+      <div class="pager">
+        <button class="pager-control pager-nav" :disabled="page === 1" @click="goToFirstPage">First</button>
+        <button class="pager-control pager-nav" :disabled="page === 1" @click="goToPreviousPage">
+          <Icon name="uil:angle-left" size="13" /> Prev
+        </button>
+        <button
+          v-for="pageIndex in pagination"
+          :key="pageIndex"
+          class="pager-control"
+          :class="pageIndex == page ? 'active' : ''"
+          @click="goToPage(pageIndex)"
+        >
+          {{ pageIndex }}
+        </button>
+        <button class="pager-control pager-nav" :disabled="page === totalPages" @click="goToNextPage">
+          Next <Icon name="uil:angle-right" size="13" />
+        </button>
+        <button class="pager-control pager-nav" :disabled="page === totalPages" @click="goToLastPage">Last</button>
+      </div>
     </div>
 
     <div v-if="isNoticeOpen" class="notice-chip" :class="noticeTone === 'error' ? 'is-error' : 'is-success'">
@@ -592,8 +638,8 @@ function setPagination() {
 
 .proxy-grid {
   display: grid;
-  gap: 0.65rem;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.46rem;
+  grid-template-columns: 1fr;
   align-content: start;
 }
 
@@ -781,20 +827,53 @@ function setPagination() {
 .pager {
   display: flex;
   justify-content: center;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.36rem;
+  flex-wrap: wrap;
+  margin-top: 0.58rem;
+  border: 1px solid rgba(120, 154, 210, 0.24);
+  border-radius: 0.92rem;
+  background: linear-gradient(145deg, rgba(16, 21, 36, 0.76), rgba(9, 13, 24, 0.86));
+  padding: 0.44rem;
 }
 
 .pager-control {
-  min-width: 36px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 0.62rem;
-  background: rgba(10, 14, 26, 0.78);
-  padding: 0.3rem 0.6rem;
+  min-width: 2.08rem;
+  height: 2.04rem;
+  border: 1px solid rgba(120, 154, 210, 0.28);
+  border-radius: 0.66rem;
+  background: rgba(9, 12, 21, 0.8);
+  color: var(--text-main);
+  padding: 0 0.58rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  transition: 0.2s ease;
+}
+
+.pager-control:hover:not(:disabled) {
+  border-color: rgba(79, 140, 255, 0.62);
+  transform: translateY(-1px);
+}
+
+.pager-nav {
+  min-width: 4.35rem;
 }
 
 .pager-control.active {
-  border-color: rgba(79, 140, 255, 0.85);
-  background: rgba(79, 140, 255, 0.15);
+  border-color: rgba(79, 140, 255, 0.88);
+  background: linear-gradient(155deg, rgba(62, 122, 242, 0.3), rgba(79, 140, 255, 0.16));
+  box-shadow: inset 0 0 0 1px rgba(157, 198, 255, 0.18);
+  color: #d8e8ff;
+}
+
+.pager-control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .notice-chip {
