@@ -24,6 +24,9 @@ type ProxyItem = {
 const proxies = ref<ProxyItem[]>([]);
 const countries = ref<string[]>([]);
 const selectedCountry = ref("All");
+const isCountryMenuOpen = ref(false);
+const isProtocolMenuOpen = ref(false);
+const isFormatMenuOpen = ref(false);
 const displayProxies = ref<ProxyItem[]>([]);
 const page = ref(0);
 const itemPerPage = ref(18);
@@ -31,6 +34,7 @@ const pagination = ref([0, 1, 2]);
 const displaySelected = ref(false);
 const isNoticeOpen = ref(false);
 const noticeText = ref("");
+const noticeTone = ref<"success" | "error">("success");
 const search = ref("");
 
 const proxySettings = reactive<ProxySettings>({
@@ -46,16 +50,76 @@ const activeHost = computed(() =>
   proxySettings.wildcard ? `${proxySettings.server}.${proxySettings.host}` : proxySettings.host,
 );
 
-const locationLabel = computed(() => {
-  const city = myip.city?.trim();
-  const region = myip.region?.trim();
-  const locationParts = [city, region].filter(Boolean);
-  return locationParts.length ? locationParts.join(", ") : "Location unavailable";
-});
-
 const countryLabel = computed(() => myip.country?.trim() || "Country unavailable");
-const totalProxyCount = computed(() => proxies.value.filter((proxy) => proxy.ip && proxy.port && proxy.isp).length);
-const selectedProxyCount = computed(() => selectedProxies.getSelectedProxies.length);
+const cityLabel = computed(() => myip.city?.trim() || "City unavailable");
+const protocolOptions = getProtocols();
+const formatOptions = getFormats();
+const countryMenuRef = ref<HTMLElement | null>(null);
+const protocolMenuRef = ref<HTMLElement | null>(null);
+const formatMenuRef = ref<HTMLElement | null>(null);
+
+function closeAllMenus() {
+  isCountryMenuOpen.value = false;
+  isProtocolMenuOpen.value = false;
+  isFormatMenuOpen.value = false;
+}
+
+function toggleCountryMenu() {
+  const next = !isCountryMenuOpen.value;
+  closeAllMenus();
+  isCountryMenuOpen.value = next;
+}
+
+function selectCountry(country: string) {
+  selectedCountry.value = country;
+  isCountryMenuOpen.value = false;
+}
+
+function toggleProtocolMenu() {
+  const next = !isProtocolMenuOpen.value;
+  closeAllMenus();
+  isProtocolMenuOpen.value = next;
+}
+
+function toggleFormatMenu() {
+  const next = !isFormatMenuOpen.value;
+  closeAllMenus();
+  isFormatMenuOpen.value = next;
+}
+
+function selectProtocol(protocol: string) {
+  if (!protocolOptions.includes(protocol)) return;
+  proxySettings.protocol = protocol as ProxySettings["protocol"];
+  isProtocolMenuOpen.value = false;
+}
+
+function selectFormat(format: string) {
+  if (!formatOptions.includes(format)) return;
+  proxySettings.format = format as ProxySettings["format"];
+  isFormatMenuOpen.value = false;
+}
+
+function closeMenusOnOutsideClick(event: PointerEvent) {
+  const target = event.target as Node;
+
+  if (countryMenuRef.value && !countryMenuRef.value.contains(target)) {
+    isCountryMenuOpen.value = false;
+  }
+
+  if (protocolMenuRef.value && !protocolMenuRef.value.contains(target)) {
+    isProtocolMenuOpen.value = false;
+  }
+
+  if (formatMenuRef.value && !formatMenuRef.value.contains(target)) {
+    isFormatMenuOpen.value = false;
+  }
+}
+
+function closeMenusOnEscape(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    closeAllMenus();
+  }
+}
 
 function applyMyIp(data: any) {
   myip.asOrganization = data?.asOrganization || data?.org || data?.organization || data?.connection?.isp || "Unavailable";
@@ -123,9 +187,11 @@ async function copyToClipboard() {
     );
     await navigator.clipboard.writeText(configResult as string);
     noticeText.value = "Proxy copied to clipboard!";
+    noticeTone.value = "success";
     isNoticeOpen.value = true;
   } catch {
     noticeText.value = "Failed to copy proxy config.";
+    noticeTone.value = "error";
     isNoticeOpen.value = true;
   }
 }
@@ -146,6 +212,18 @@ watch([isNoticeOpen], () => {
 if (import.meta.client) {
   loadMyIp();
 }
+
+onMounted(() => {
+  if (!import.meta.client) return;
+  document.addEventListener("pointerdown", closeMenusOnOutsideClick);
+  document.addEventListener("keydown", closeMenusOnEscape);
+});
+
+onBeforeUnmount(() => {
+  if (!import.meta.client) return;
+  document.removeEventListener("pointerdown", closeMenusOnOutsideClick);
+  document.removeEventListener("keydown", closeMenusOnEscape);
+});
 
 useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/main/Proxy/proxyList.txt").then((res) => {
   if (res.status.value === "success") {
@@ -192,38 +270,107 @@ function setPagination() {
 <template>
   <dialog id="settings_dialog" class="settings-dialog">
     <div class="settings-card">
-      <h3>Profile Settings</h3>
-      <p>Tune server profile before export.</p>
+      <div class="settings-head">
+        <h3>Profile Settings</h3>
+        <p>Tune server profile before export.</p>
+      </div>
 
-      <div class="field-grid">
-        <label class="field">
-          <span>Server</span>
-          <input v-model="proxySettings.server" type="text" placeholder="support.zoom.us" />
-        </label>
-        <label class="field">
-          <span>Host</span>
-          <input v-model="proxySettings.host" type="text" placeholder="vpn.bits.co.id" />
-        </label>
-        <label class="field">
-          <span>Protocol</span>
-          <select v-model="proxySettings.protocol">
-            <option v-for="protocol in getProtocols()" :key="protocol" :value="protocol">{{ protocol }}</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Format</span>
-          <select v-model="proxySettings.format">
-            <option v-for="format in getFormats()" :key="format" :value="format">{{ format }}</option>
-          </select>
-        </label>
-        <label class="field switcher">
-          <span>TLS</span>
-          <input v-model="proxySettings.tls" type="checkbox" />
-        </label>
-        <label class="field switcher">
-          <span>Wildcard</span>
-          <input v-model="proxySettings.wildcard" type="checkbox" />
-        </label>
+      <div class="settings-layout">
+        <div class="field-grid">
+          <label class="field">
+            <span>Server</span>
+            <div class="field-shell">
+              <Icon name="uil:server-network" size="13" />
+              <input v-model="proxySettings.server" type="text" placeholder="support.zoom.us" />
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Host</span>
+            <div class="field-shell">
+              <Icon name="uil:link-h" size="13" />
+              <input v-model="proxySettings.host" type="text" placeholder="vpn.bits.co.id" />
+            </div>
+          </label>
+
+          <div ref="protocolMenuRef" class="field menu-field" :class="isProtocolMenuOpen ? 'is-open' : ''">
+            <span>Protocol</span>
+            <button type="button" class="field-select" :aria-expanded="isProtocolMenuOpen" aria-haspopup="listbox" @click="toggleProtocolMenu">
+              <span class="select-text">{{ proxySettings.protocol }}</span>
+              <span class="select-caret"><Icon name="uil:angle-down" size="13" /></span>
+            </button>
+            <div v-if="isProtocolMenuOpen" class="select-menu settings-menu" role="listbox" aria-label="Select protocol">
+              <button
+                v-for="protocol in protocolOptions"
+                :key="protocol"
+                type="button"
+                class="select-option"
+                :class="protocol === proxySettings.protocol ? 'active' : ''"
+                role="option"
+                :aria-selected="protocol === proxySettings.protocol"
+                @click="selectProtocol(protocol)"
+              >
+                {{ protocol }}
+              </button>
+            </div>
+          </div>
+
+          <div ref="formatMenuRef" class="field menu-field" :class="isFormatMenuOpen ? 'is-open' : ''">
+            <span>Format</span>
+            <button type="button" class="field-select" :aria-expanded="isFormatMenuOpen" aria-haspopup="listbox" @click="toggleFormatMenu">
+              <span class="select-text">{{ proxySettings.format }}</span>
+              <span class="select-caret"><Icon name="uil:angle-down" size="13" /></span>
+            </button>
+            <div v-if="isFormatMenuOpen" class="select-menu settings-menu" role="listbox" aria-label="Select format">
+              <button
+                v-for="format in formatOptions"
+                :key="format"
+                type="button"
+                class="select-option"
+                :class="format === proxySettings.format ? 'active' : ''"
+                role="option"
+                :aria-selected="format === proxySettings.format"
+                @click="selectFormat(format)"
+              >
+                {{ format }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="switch-grid">
+          <div class="switch-field">
+            <span>TLS</span>
+            <div class="toggle-row">
+              <span class="toggle-label"><Icon name="uil:shield-check" size="13" /> Enabled</span>
+              <button
+                type="button"
+                class="toggle-switch"
+                :class="proxySettings.tls ? 'is-on' : ''"
+                :aria-pressed="proxySettings.tls"
+                @click="proxySettings.tls = !proxySettings.tls"
+              >
+                <span class="toggle-knob"></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="switch-field">
+            <span>Wildcard</span>
+            <div class="toggle-row">
+              <span class="toggle-label"><Icon name="uil:asterisk" size="13" /> Enabled</span>
+              <button
+                type="button"
+                class="toggle-switch"
+                :class="proxySettings.wildcard ? 'is-on' : ''"
+                :aria-pressed="proxySettings.wildcard"
+                @click="proxySettings.wildcard = !proxySettings.wildcard"
+              >
+                <span class="toggle-knob"></span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="preview">Effective host: <strong>{{ activeHost }}</strong></div>
@@ -244,8 +391,18 @@ function setPagination() {
       </h1>
 
       <div class="head-pills">
-        <span class="head-pill"><Icon name="uil:server-network" size="13" /> {{ totalProxyCount }}</span>
-        <span class="head-pill"><Icon name="uil:check-circle" size="13" /> {{ selectedProxyCount }}</span>
+        <span class="head-pill data-pill">
+          <Icon name="uil:building" size="13" />
+          <span class="pill-text">{{ myip.asOrganization }}</span>
+        </span>
+        <span class="head-pill data-pill">
+          <Icon name="uil:wifi" size="13" />
+          <span class="pill-text">{{ myip.ip }}</span>
+        </span>
+        <span class="head-pill data-pill">
+          <Icon name="uil:globe" size="13" />
+          <span class="pill-text">{{ countryLabel }} - {{ cityLabel }}</span>
+        </span>
       </div>
     </div>
 
@@ -255,12 +412,33 @@ function setPagination() {
         <input v-model="search" type="text" placeholder="Search provider" class="input-surface" />
       </label>
 
-      <label class="ribbon-select">
+      <div ref="countryMenuRef" class="ribbon-select" :class="isCountryMenuOpen ? 'is-open' : ''">
         <Icon name="uil:globe" size="14" />
-        <select v-model="selectedCountry" class="select-surface">
-          <option v-for="country in countries" :key="country">{{ country }}</option>
-        </select>
-      </label>
+        <button
+          type="button"
+          class="select-surface"
+          :aria-expanded="isCountryMenuOpen"
+          aria-haspopup="listbox"
+          @click="toggleCountryMenu"
+        >
+          <span class="select-text">{{ selectedCountry }}</span>
+          <span class="select-caret"><Icon name="uil:angle-down" size="13" /></span>
+        </button>
+        <div v-if="isCountryMenuOpen" class="select-menu" role="listbox" aria-label="Select country">
+          <button
+            v-for="country in countries"
+            :key="country"
+            type="button"
+            class="select-option"
+            :class="country === selectedCountry ? 'active' : ''"
+            role="option"
+            :aria-selected="country === selectedCountry"
+            @click="selectCountry(country)"
+          >
+            {{ country }}
+          </button>
+        </div>
+      </div>
 
       <button class="panel-button ghost" @click="displaySelected = !displaySelected">
         <Icon name="uil:list-ul" size="14" />
@@ -271,24 +449,6 @@ function setPagination() {
       <button class="panel-button export" @click="copyToClipboard">
         <Icon name="uil:import" size="14" /> Export
       </button>
-    </div>
-
-    <div class="meta-grid">
-      <article class="meta-tile">
-        <span class="meta-icon"><Icon name="uil:building" size="14" /></span>
-        <div>
-          <strong>{{ myip.asOrganization }}</strong>
-          <p>{{ myip.ip }}</p>
-        </div>
-      </article>
-
-      <article class="meta-tile">
-        <span class="meta-icon"><Icon name="uil:map-marker" size="14" /></span>
-        <div>
-          <strong>{{ locationLabel }}</strong>
-          <p>{{ countryLabel }}</p>
-        </div>
-      </article>
     </div>
 
     <div class="proxy-grid-wrap">
@@ -317,7 +477,10 @@ function setPagination() {
       <button class="pager-control" @click="page++">&gt;</button>
     </div>
 
-    <div v-if="isNoticeOpen" class="notice-chip">{{ noticeText }}</div>
+    <div v-if="isNoticeOpen" class="notice-chip" :class="noticeTone === 'error' ? 'is-error' : 'is-success'">
+      <Icon :name="noticeTone === 'error' ? 'uil:exclamation-circle' : 'uil:check-circle'" size="15" />
+      {{ noticeText }}
+    </div>
   </section>
 </template>
 
@@ -363,6 +526,8 @@ function setPagination() {
 .head-pills {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.32rem;
 }
 
@@ -376,9 +541,22 @@ function setPagination() {
   display: inline-flex;
   align-items: center;
   gap: 0.24rem;
+  min-width: 0;
+}
+
+.head-pill.data-pill {
+  max-width: min(36vw, 240px);
+}
+
+.pill-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .control-ribbon {
+  --control-height: 2.1rem;
   border: 1px solid var(--line);
   border-radius: 0.9rem;
   background: linear-gradient(145deg, rgba(16, 21, 36, 0.88), rgba(10, 14, 26, 0.94));
@@ -394,56 +572,15 @@ function setPagination() {
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 0.72rem;
   background: rgba(9, 11, 18, 0.66);
-  padding: 0.28rem 0.52rem;
+  height: var(--control-height);
+  padding: 0 0.52rem;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
 }
 
-.meta-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
-.meta-tile {
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 0.82rem;
-  background: rgba(12, 17, 31, 0.74);
-  padding: 0.55rem 0.65rem;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.meta-icon {
-  width: 1.45rem;
-  height: 1.45rem;
-  border-radius: 0.45rem;
-  background: rgba(79, 140, 255, 0.18);
-  color: #a8c5ff;
-  display: grid;
-  place-items: center;
-}
-
-.meta-tile strong,
-.meta-tile p {
-  margin: 0;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.meta-tile strong {
-  font-size: 0.9rem;
-}
-
-.meta-tile p {
-  margin-top: 0.14rem;
-  color: var(--text-soft);
-  font-size: 0.77rem;
+.ribbon-select {
+  position: relative;
 }
 
 .proxy-grid-wrap {
@@ -461,15 +598,156 @@ function setPagination() {
 }
 
 .input-surface,
-.select-surface,
-.settings-card input,
-.settings-card select {
+.select-surface {
   width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   border: 0;
-  border-radius: 0.7rem;
+  border-radius: 0;
   background: transparent;
   color: var(--text-main);
-  padding: 0.3rem 0.35rem;
+  font-size: 0.78rem;
+  line-height: 1;
+  padding: 0;
+  outline: none;
+}
+
+.select-surface {
+  cursor: pointer;
+  height: calc(100% - 0.52rem);
+  border: 1px solid rgba(120, 154, 210, 0.34);
+  border-radius: 0.58rem;
+  background: linear-gradient(145deg, rgba(14, 20, 35, 0.9), rgba(10, 15, 28, 0.95));
+  padding: 0 0.42rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.34rem;
+}
+
+.select-caret {
+  color: #9fb4db;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ribbon-select.is-open .select-caret {
+  transform: rotate(180deg);
+}
+
+.select-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.select-menu {
+  position: absolute;
+  top: calc(100% + 0.38rem);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  border: 1px solid rgba(120, 154, 210, 0.32);
+  border-radius: 0.68rem;
+  background: linear-gradient(155deg, rgba(14, 20, 35, 0.98), rgba(10, 15, 28, 0.98));
+  box-shadow: 0 10px 30px rgba(3, 7, 18, 0.55);
+  padding: 0.24rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.select-option {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.76rem;
+  line-height: 1.2;
+  text-align: left;
+  padding: 0.42rem 0.5rem;
+  transition: 0.16s ease;
+}
+
+.select-option:hover {
+  border-color: rgba(120, 154, 210, 0.28);
+  background: rgba(120, 154, 210, 0.12);
+}
+
+.select-option.active {
+  border-color: rgba(120, 154, 210, 0.45);
+  background: rgba(120, 154, 210, 0.18);
+  color: #dce8ff;
+}
+
+.settings-card select option {
+  background: #0d1422;
+  color: #e5edff;
+}
+
+.input-surface:focus,
+.input-surface:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.select-surface:focus,
+.select-surface:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(120, 154, 210, 0.22);
+}
+
+.settings-card input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-main);
+  padding: 0;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.field-shell,
+.field-select,
+.toggle-row {
+  width: 100%;
+  min-height: 2.2rem;
+  border: 1px solid rgba(120, 154, 210, 0.32);
+  border-radius: 0.7rem;
+  background: linear-gradient(145deg, rgba(14, 20, 35, 0.94), rgba(10, 15, 28, 0.98));
+  color: var(--text-main);
+  padding: 0 0.56rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+}
+
+.field-shell :deep(svg),
+.field-select :deep(svg),
+.toggle-label :deep(svg) {
+  color: #9fb4db;
+}
+
+.menu-field {
+  position: relative;
+}
+
+.field-select {
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.menu-field.is-open .select-caret {
+  transform: rotate(180deg);
+}
+
+.settings-menu {
+  top: calc(100% + 0.34rem);
 }
 
 .panel-button {
@@ -477,7 +755,8 @@ function setPagination() {
   border-radius: 0.7rem;
   background: rgba(10, 14, 26, 0.72);
   color: var(--text-main);
-  padding: 0.42rem 0.66rem;
+  height: var(--control-height, 2.1rem);
+  padding: 0 0.66rem;
   font-size: 0.78rem;
   display: inline-flex;
   align-items: center;
@@ -521,12 +800,26 @@ function setPagination() {
 .notice-chip {
   position: fixed;
   right: 1rem;
-  bottom: 1rem;
-  border: 1px solid rgba(79, 140, 255, 0.4);
-  background: rgba(16, 21, 36, 0.94);
-  border-radius: 0.7rem;
-  padding: 0.5rem 0.75rem;
-  z-index: 60;
+  top: 1rem;
+  border-radius: 0.62rem;
+  padding: 0.36rem 0.58rem;
+  font-size: 0.74rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+  z-index: 80;
+}
+
+.notice-chip.is-success {
+  border: 1px solid rgba(96, 235, 190, 0.45);
+  background: rgba(20, 58, 49, 0.92);
+  color: #bcefe2;
+}
+
+.notice-chip.is-error {
+  border: 1px solid rgba(255, 127, 157, 0.45);
+  background: rgba(70, 23, 36, 0.92);
+  color: #ffd1dc;
 }
 
 @media (max-width: 1100px) {
@@ -550,9 +843,6 @@ function setPagination() {
     grid-template-columns: 1fr;
   }
 
-  .meta-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @keyframes pulseIcon {
@@ -566,17 +856,20 @@ function setPagination() {
 }
 
 .settings-card {
-  border: 1px solid var(--line);
-  background: rgba(12, 17, 30, 0.98);
-  border-radius: 0.95rem;
+  border: 1px solid rgba(120, 154, 210, 0.28);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(79, 140, 255, 0.18), transparent 50%),
+    linear-gradient(160deg, rgba(13, 18, 33, 0.98), rgba(9, 13, 25, 0.99));
+  border-radius: 1rem;
   padding: 1rem;
+  box-shadow: 0 16px 42px rgba(2, 6, 18, 0.56);
 }
 
 .settings-dialog {
   border: none;
-  border-radius: 0.95rem;
+  border-radius: 1rem;
   padding: 0;
-  width: min(740px, 92vw);
+  width: min(760px, 92vw);
   max-height: min(84vh, 760px);
   background: transparent;
 }
@@ -587,52 +880,137 @@ function setPagination() {
 }
 
 .settings-actions {
-  margin-top: 0.8rem;
+  margin-top: 0.9rem;
   display: flex;
   justify-content: flex-end;
 }
 
-.settings-card h3 {
+.settings-head h3 {
+  margin: 0;
   font-family: "Space Grotesk", sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.06rem;
+  color: var(--text-main);
 }
 
-.settings-card p {
+.settings-head p {
   color: var(--text-soft);
-  margin-top: 0.35rem;
-  margin-bottom: 0.7rem;
+  margin: 0.3rem 0 0.72rem;
+  font-size: 0.8rem;
+}
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(180px, 0.85fr);
+  gap: 0.72rem;
 }
 
 .field-grid {
   display: grid;
-  gap: 0.65rem;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.58rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .field {
   display: grid;
-  gap: 0.34rem;
+  gap: 0.28rem;
 }
 
 .field span {
   color: var(--text-soft);
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
 }
 
-.switcher {
-  align-content: center;
+.switch-grid {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+}
+
+.switch-field {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.switch-field > span {
+  color: var(--text-soft);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.toggle-row {
+  padding: 0 0.56rem;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--text-main);
+  font-size: 0.77rem;
+}
+
+.toggle-switch {
+  width: 2.35rem;
+  height: 1.3rem;
+  border: 1px solid rgba(120, 154, 210, 0.32);
+  border-radius: 9999px;
+  background: rgba(51, 65, 85, 0.42);
+  padding: 0.12rem;
+  display: inline-flex;
+  align-items: center;
+  transition: 0.22s ease;
+}
+
+.toggle-knob {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 9999px;
+  background: #d7e6ff;
+  box-shadow: 0 1px 7px rgba(3, 8, 18, 0.4);
+  transition: 0.22s ease;
+}
+
+.toggle-switch.is-on {
+  border-color: rgba(79, 140, 255, 0.62);
+  background: rgba(79, 140, 255, 0.34);
+}
+
+.toggle-switch.is-on .toggle-knob {
+  transform: translateX(1.02rem);
+  background: #ffffff;
 }
 
 .preview {
-  margin-top: 0.65rem;
-  font-size: 0.84rem;
+  margin-top: 0.72rem;
+  border: 1px solid rgba(120, 154, 210, 0.2);
+  border-radius: 0.72rem;
+  background: rgba(10, 14, 26, 0.7);
+  padding: 0.45rem 0.58rem;
+  font-size: 0.77rem;
   color: var(--text-soft);
 }
 
 .preview strong {
   color: var(--text-main);
+}
+
+@media (max-width: 760px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-actions .panel-button {
+    width: 100%;
+  }
 }
 
 @keyframes reveal {

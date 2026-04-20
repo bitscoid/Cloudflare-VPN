@@ -210,12 +210,12 @@ onMounted(async () => {
 }
 
 .head-row {
+  width: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   gap: 0.6rem;
-  margin: 0.5rem 0 0.9rem;
-  position: relative;
+  margin: 0.3rem 0 0.5rem;
 }
 
 .view-title {
@@ -238,14 +238,13 @@ onMounted(async () => {
   color: #cfe0ff;
   display: grid;
   place-items: center;
+  animation: pulseIcon 2.8s ease-in-out infinite;
 }
 
 .head-pills {
   display: inline-flex;
   align-items: center;
   gap: 0.32rem;
-  position: absolute;
-  right: 0;
 }
 
 .refresh-pill {
@@ -463,6 +462,16 @@ onMounted(async () => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pulseIcon {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2), 0 0 0 rgba(79, 140, 255, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.34), 0 0 14px rgba(79, 140, 255, 0.26);
   }
 }
 

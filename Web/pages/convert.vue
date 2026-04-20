@@ -125,9 +125,10 @@ onBeforeUnmount(() => {
 .head-row {
   width: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  margin: 0.5rem 0 0.9rem;
+  margin: 0.3rem 0 0.5rem;
+  gap: 0.6rem;
 }
 
 .view-title {
@@ -150,6 +151,7 @@ onBeforeUnmount(() => {
   color: #cfe0ff;
   display: grid;
   place-items: center;
+  animation: pulseIcon 2.8s ease-in-out infinite;
 }
 
 .workspace-card {
@@ -246,14 +248,14 @@ onBeforeUnmount(() => {
 .copy-notice {
   position: fixed;
   right: 1rem;
-  bottom: 1rem;
-  border-radius: 0.7rem;
-  padding: 0.45rem 0.72rem;
-  font-size: 0.8rem;
+  top: 1rem;
+  border-radius: 0.62rem;
+  padding: 0.36rem 0.58rem;
+  font-size: 0.74rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.32rem;
-  z-index: 60;
+  gap: 0.24rem;
+  z-index: 80;
 }
 
 .copy-notice.is-success {
@@ -302,6 +304,16 @@ onBeforeUnmount(() => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes pulseIcon {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2), 0 0 0 rgba(79, 140, 255, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.34), 0 0 14px rgba(79, 140, 255, 0.26);
   }
 }
 </style>
