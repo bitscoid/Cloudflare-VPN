@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "license": "ISC",
   "type": "module",
+  "scripts": {
+    "typecheck": "bun x tsc --noEmit"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },

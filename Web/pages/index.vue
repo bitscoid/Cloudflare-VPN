@@ -1,13 +1,13 @@
 <script setup lang="ts">
 definePageMeta({
-  title: "BITS VPN",
-});
+  title: 'BITS VPN',
+})
 
 const ctas = [
-  { to: "/build", icon: "uil:wrench", label: "Build", style: "cta-build" },
-  { to: "/convert", icon: "uil:sync", label: "Convert", style: "cta-convert" },
-  { to: "/monitor", icon: "uil:chart-line", label: "Monitor", style: "cta-monitor" },
-];
+  { to: '/build', icon: 'uil:wrench', label: 'Build', style: 'cta-build' },
+  { to: '/convert', icon: 'uil:sync', label: 'Convert', style: 'cta-convert' },
+  { to: '/monitor', icon: 'uil:chart-line', label: 'Monitor', style: 'cta-monitor' },
+]
 </script>
 
 <template>
@@ -28,7 +28,6 @@ const ctas = [
           {{ cta.label }}
         </NuxtLink>
       </div>
-
     </div>
   </section>
 </template>
@@ -57,7 +56,7 @@ const ctas = [
 
 h1 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(2.1rem, 7vw, 4.5rem);
   line-height: 0.95;
 }
@@ -87,7 +86,10 @@ h1 {
   padding: 0.5rem 0.82rem;
   font-size: 0.9rem;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-  transition: transform 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    filter 0.2s ease;
 }
 
 .cta-build {

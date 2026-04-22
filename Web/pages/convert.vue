@@ -1,79 +1,79 @@
 <script setup lang="ts">
 definePageMeta({
-  title: "Convert",
-});
+  title: 'Convert',
+})
 
-const config = useRuntimeConfig();
-const rawProxies = ref("");
-const convertedProxies = ref("");
-const convertFormats = ref(["clash", "provider"]);
-const isLoading = ref(false);
-const activeFormat = ref("clash");
-const isNoticeOpen = ref(false);
-const noticeText = ref("");
-const noticeTone = ref<"success" | "error">("success");
-const errorMessage = ref("");
+const config = useRuntimeConfig()
+const rawProxies = ref('')
+const convertedProxies = ref('')
+const convertFormats = ref(['clash', 'provider'])
+const isLoading = ref(false)
+const activeFormat = ref('clash')
+const isNoticeOpen = ref(false)
+const noticeText = ref('')
+const noticeTone = ref<'success' | 'error'>('success')
+const errorMessage = ref('')
 
-let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
-function showNotice(text: string, tone: "success" | "error") {
-  noticeText.value = text;
-  noticeTone.value = tone;
-  isNoticeOpen.value = true;
+function showNotice(text: string, tone: 'success' | 'error') {
+  noticeText.value = text
+  noticeTone.value = tone
+  isNoticeOpen.value = true
 
-  if (noticeTimer) clearTimeout(noticeTimer);
+  if (noticeTimer) clearTimeout(noticeTimer)
   noticeTimer = setTimeout(() => {
-    isNoticeOpen.value = false;
-  }, 2200);
+    isNoticeOpen.value = false
+  }, 2200)
 }
 
 async function convertProxiesTo(format: string) {
   if (!rawProxies.value.trim()) {
-    showNotice("Please enter proxy URLs first", "error");
-    return;
+    showNotice('Please enter proxy URLs first', 'error')
+    return
   }
 
-  isLoading.value = true;
-  activeFormat.value = format;
-  errorMessage.value = "";
+  isLoading.value = true
+  activeFormat.value = format
+  errorMessage.value = ''
   try {
     const res = await fetch(`${config.public.apiBase}/convert`, {
-      method: "post",
+      method: 'post',
       body: JSON.stringify({
-        url: rawProxies.value.split("\n").join(","),
+        url: rawProxies.value.split('\n').join(','),
         format,
       }),
-    });
+    })
 
     if (!res.ok) {
-      throw new Error(`Server error: ${res.status}`);
+      throw new Error(`Server error: ${res.status}`)
     }
-    convertedProxies.value = await res.text();
+    convertedProxies.value = await res.text()
   } catch (e: Error) {
-    errorMessage.value = e.message;
-    showNotice("Conversion failed", "error");
+    errorMessage.value = e.message
+    showNotice('Conversion failed', 'error')
   } finally {
-    isLoading.value = false;
+    isLoading.value = false
   }
 }
 
 async function copyToClipboard() {
   if (!convertedProxies.value.trim()) {
-    showNotice("No result to copy", "error");
-    return;
+    showNotice('No result to copy', 'error')
+    return
   }
 
   try {
-    await navigator.clipboard.writeText(convertedProxies.value);
-    showNotice("Copied to clipboard", "success");
+    await navigator.clipboard.writeText(convertedProxies.value)
+    showNotice('Copied to clipboard', 'success')
   } catch {
-    showNotice("Copy failed", "error");
+    showNotice('Copy failed', 'error')
   }
 }
 
 onBeforeUnmount(() => {
-  if (noticeTimer) clearTimeout(noticeTimer);
-});
+  if (noticeTimer) clearTimeout(noticeTimer)
+})
 </script>
 
 <template>
@@ -88,7 +88,12 @@ onBeforeUnmount(() => {
     <div class="workspace-card">
       <section class="editor-panel">
         <p class="panel-label"><Icon name="uil:link-alt" size="13" aria-hidden="true" /> Raw URL</p>
-        <textarea v-model="rawProxies" class="surface" placeholder="vless://..." aria-label="Enter proxy URLs to convert"></textarea>
+        <textarea
+          v-model="rawProxies"
+          class="surface"
+          placeholder="vless://..."
+          aria-label="Enter proxy URLs to convert"
+        ></textarea>
       </section>
 
       <div class="control-stack" role="group" aria-label="Conversion options">
@@ -101,23 +106,45 @@ onBeforeUnmount(() => {
           :aria-busy="isLoading && activeFormat === format"
           @click="convertProxiesTo(format)"
         >
-          <Icon :name="format === 'clash' ? 'uil:rocket' : 'uil:server-network'" size="13" aria-hidden="true" />
-          {{ isLoading && activeFormat === format ? "Running..." : format.toUpperCase() }}
+          <Icon
+            :name="format === 'clash' ? 'uil:rocket' : 'uil:server-network'"
+            size="13"
+            aria-hidden="true"
+          />
+          {{ isLoading && activeFormat === format ? 'Running...' : format.toUpperCase() }}
         </button>
 
-        <button class="format-pill format-copy" @click="copyToClipboard" aria-label="Copy converted result">
+        <button
+          class="format-pill format-copy"
+          @click="copyToClipboard"
+          aria-label="Copy converted result"
+        >
           <Icon name="uil:copy" size="13" aria-hidden="true" /> Copy
         </button>
       </div>
 
       <section class="editor-panel">
         <p class="panel-label"><Icon name="uil:file-alt" size="13" aria-hidden="true" /> Result</p>
-        <textarea :value="convertedProxies || errorMessage" class="surface" :placeholder="errorMessage || 'result...'" readonly aria-label="Converted result" :aria-invalid="!!errorMessage"></textarea>
+        <textarea
+          :value="convertedProxies || errorMessage"
+          class="surface"
+          :placeholder="errorMessage || 'result...'"
+          readonly
+          aria-label="Converted result"
+          :aria-invalid="!!errorMessage"
+        ></textarea>
       </section>
     </div>
 
-    <div v-if="isNoticeOpen" class="copy-notice" :class="noticeTone === 'error' ? 'is-error' : 'is-success'">
-      <Icon :name="noticeTone === 'error' ? 'uil:exclamation-circle' : 'uil:check-circle'" size="15" />
+    <div
+      v-if="isNoticeOpen"
+      class="copy-notice"
+      :class="noticeTone === 'error' ? 'is-error' : 'is-success'"
+    >
+      <Icon
+        :name="noticeTone === 'error' ? 'uil:exclamation-circle' : 'uil:check-circle'"
+        size="15"
+      />
       {{ noticeText }}
     </div>
   </section>
@@ -149,7 +176,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(1.15rem, 2.3vw, 1.45rem);
   letter-spacing: 0.01em;
 }

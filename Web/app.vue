@@ -1,41 +1,41 @@
 <script setup lang="ts">
-const route = useRoute();
-const appName = "BITS VPN";
-const error = ref<Error | null>(null);
+const route = useRoute()
+const appName = 'BITS VPN'
+const error = ref<Error | null>(null)
 
 function getNormalizedPath(path: string) {
-  if (!path || path === "/") return "/";
-  return path.replace(/\/+$/, "") || "/";
+  if (!path || path === '/') return '/'
+  return path.replace(/\/+$/, '') || '/'
 }
 
 function isSinglePagePath(path: string) {
-  const normalized = getNormalizedPath(path);
-  return normalized === "/" || normalized === "/convert" || normalized === "/monitor";
+  const normalized = getNormalizedPath(path)
+  return normalized === '/' || normalized === '/convert' || normalized === '/monitor'
 }
 
 onErrorCaptured((err: Error) => {
-  error.value = err;
-  console.error("App error:", err.message);
-  return false;
-});
+  error.value = err
+  console.error('App error:', err.message)
+  return false
+})
 
 function clearError() {
-  error.value = null;
+  error.value = null
 }
 
 useHead(() => {
-  const pageTitle = typeof route.meta?.title === "string" ? route.meta.title.trim() : "";
-  const current = pageTitle || appName;
-  const title = current === appName ? appName : `${current} | ${appName}`;
-  const isSinglePage = isSinglePagePath(route.path);
+  const pageTitle = typeof route.meta?.title === 'string' ? route.meta.title.trim() : ''
+  const current = pageTitle || appName
+  const title = current === appName ? appName : `${current} | ${appName}`
+  const isSinglePage = isSinglePagePath(route.path)
 
   return {
     title,
     bodyAttrs: {
-      class: isSinglePage ? "single-page-body" : undefined,
+      class: isSinglePage ? 'single-page-body' : undefined,
     },
-  };
-});
+  }
+})
 </script>
 
 <template>
@@ -56,7 +56,7 @@ useHead(() => {
 </template>
 
 <style>
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root {
   --bg-main: #05070d;
@@ -92,7 +92,7 @@ body {
   margin: 0;
   color: var(--text-main);
   background: var(--bg-main);
-  font-family: "Plus Jakarta Sans", sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
 .app-canvas {
@@ -103,7 +103,7 @@ body {
 }
 
 .app-canvas::before {
-  content: "";
+  content: '';
   position: fixed;
   left: 0;
   right: 0;
@@ -141,10 +141,14 @@ body {
 @keyframes pulseIcon {
   0%,
   100% {
-    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2), 0 0 0 rgba(79, 140, 255, 0);
+    box-shadow:
+      inset 0 0 0 1px rgba(79, 140, 255, 0.2),
+      0 0 0 rgba(79, 140, 255, 0);
   }
   50% {
-    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.34), 0 0 14px rgba(79, 140, 255, 0.26);
+    box-shadow:
+      inset 0 0 0 1px rgba(79, 140, 255, 0.34),
+      0 0 14px rgba(79, 140, 255, 0.26);
   }
 }
 

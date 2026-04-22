@@ -1,335 +1,348 @@
 <script setup lang="ts">
 definePageMeta({
-  title: "Build",
-});
+  title: 'Build',
+})
 
-const config = useRuntimeConfig();
-const route = useRoute();
-const selectedProxies = useSelectedProxiesStore();
+const config = useRuntimeConfig()
+const route = useRoute()
+const selectedProxies = useSelectedProxiesStore()
 
 const myip = reactive({
-  asOrganization: "Unavailable",
-  ip: "Unavailable",
-  city: "",
-  region: "",
-  country: "",
-});
+  asOrganization: 'Unavailable',
+  ip: 'Unavailable',
+  city: '',
+  region: '',
+  country: '',
+})
 
 type ProxyItem = {
-  ip: string;
-  isp: string;
-  port: string;
-  country: string;
-};
+  ip: string
+  isp: string
+  port: string
+  country: string
+}
 
-const proxies = ref<ProxyItem[]>([]);
-const countries = ref<string[]>([]);
-const selectedCountry = ref("All");
-const isCountryMenuOpen = ref(false);
-const isProtocolMenuOpen = ref(false);
-const isFormatMenuOpen = ref(false);
-const displayProxies = ref<ProxyItem[]>([]);
-const page = ref(1);
-const itemPerPage = ref(10);
-const pagination = ref([1]);
-const totalPages = ref(1);
-const displaySelected = ref(false);
-const isNoticeOpen = ref(false);
-const noticeText = ref("");
-const noticeTone = ref<"success" | "error">("success");
-const search = ref("");
-const settingsDialogRef = ref<HTMLDialogElement | null>(null);
-const isLoading = ref(true);
-const loadError = ref("");
+const proxies = ref<ProxyItem[]>([])
+const countries = ref<string[]>([])
+const selectedCountry = ref('All')
+const isCountryMenuOpen = ref(false)
+const isProtocolMenuOpen = ref(false)
+const isFormatMenuOpen = ref(false)
+const displayProxies = ref<ProxyItem[]>([])
+const page = ref(1)
+const itemPerPage = ref(10)
+const pagination = ref([1])
+const totalPages = ref(1)
+const displaySelected = ref(false)
+const isNoticeOpen = ref(false)
+const noticeText = ref('')
+const noticeTone = ref<'success' | 'error'>('success')
+const search = ref('')
+const settingsDialogRef = ref<HTMLDialogElement | null>(null)
+const isLoading = ref(true)
+const loadError = ref('')
 
 function openSettingsDialog() {
-  settingsDialogRef.value?.showModal();
+  settingsDialogRef.value?.showModal()
 }
 
 const proxySettings = reactive<ProxySettings>({
-  protocol: "trojan",
-  format: "raw",
+  protocol: 'trojan',
+  format: 'raw',
   tls: true,
-  host: route.query.host?.toString() || "vpn.bits.co.id",
-  server: "support.zoom.us",
+  host: route.query.host?.toString() || 'vpn.bits.co.id',
+  server: 'support.zoom.us',
   wildcard: false,
-});
+})
 
 const activeHost = computed(() =>
-  proxySettings.wildcard ? `${proxySettings.server}.${proxySettings.host}` : proxySettings.host,
-);
+  proxySettings.wildcard ? `${proxySettings.server}.${proxySettings.host}` : proxySettings.host
+)
 
-const countryLabel = computed(() => myip.country?.trim() || "Country unavailable");
-const cityLabel = computed(() => myip.city?.trim() || "City unavailable");
-const protocolOptions = getProtocols();
-const formatOptions = getFormats();
-const countryMenuRef = ref<HTMLElement | null>(null);
-const protocolMenuRef = ref<HTMLElement | null>(null);
-const formatMenuRef = ref<HTMLElement | null>(null);
+const countryLabel = computed(() => myip.country?.trim() || 'Country unavailable')
+const cityLabel = computed(() => myip.city?.trim() || 'City unavailable')
+const protocolOptions = getProtocols()
+const formatOptions = getFormats()
+const countryMenuRef = ref<HTMLElement | null>(null)
+const protocolMenuRef = ref<HTMLElement | null>(null)
+const formatMenuRef = ref<HTMLElement | null>(null)
 
 function closeAllMenus() {
-  isCountryMenuOpen.value = false;
-  isProtocolMenuOpen.value = false;
-  isFormatMenuOpen.value = false;
+  isCountryMenuOpen.value = false
+  isProtocolMenuOpen.value = false
+  isFormatMenuOpen.value = false
 }
 
 function toggleCountryMenu() {
-  const next = !isCountryMenuOpen.value;
-  closeAllMenus();
-  isCountryMenuOpen.value = next;
+  const next = !isCountryMenuOpen.value
+  closeAllMenus()
+  isCountryMenuOpen.value = next
 }
 
 function selectCountry(country: string) {
-  selectedCountry.value = country;
-  isCountryMenuOpen.value = false;
+  selectedCountry.value = country
+  isCountryMenuOpen.value = false
 }
 
 function toggleProtocolMenu() {
-  const next = !isProtocolMenuOpen.value;
-  closeAllMenus();
-  isProtocolMenuOpen.value = next;
+  const next = !isProtocolMenuOpen.value
+  closeAllMenus()
+  isProtocolMenuOpen.value = next
 }
 
 function toggleFormatMenu() {
-  const next = !isFormatMenuOpen.value;
-  closeAllMenus();
-  isFormatMenuOpen.value = next;
+  const next = !isFormatMenuOpen.value
+  closeAllMenus()
+  isFormatMenuOpen.value = next
 }
 
 function selectProtocol(protocol: string) {
-  if (!protocolOptions.includes(protocol)) return;
-  proxySettings.protocol = protocol as ProxySettings["protocol"];
-  isProtocolMenuOpen.value = false;
+  if (!protocolOptions.includes(protocol)) return
+  proxySettings.protocol = protocol as ProxySettings['protocol']
+  isProtocolMenuOpen.value = false
 }
 
 function selectFormat(format: string) {
-  if (!formatOptions.includes(format)) return;
-  proxySettings.format = format as ProxySettings["format"];
-  isFormatMenuOpen.value = false;
+  if (!formatOptions.includes(format)) return
+  proxySettings.format = format as ProxySettings['format']
+  isFormatMenuOpen.value = false
 }
 
 function closeMenusOnOutsideClick(event: PointerEvent) {
-  const target = event.target as Node;
+  const target = event.target as Node
 
   if (countryMenuRef.value && !countryMenuRef.value.contains(target)) {
-    isCountryMenuOpen.value = false;
+    isCountryMenuOpen.value = false
   }
 
   if (protocolMenuRef.value && !protocolMenuRef.value.contains(target)) {
-    isProtocolMenuOpen.value = false;
+    isProtocolMenuOpen.value = false
   }
 
   if (formatMenuRef.value && !formatMenuRef.value.contains(target)) {
-    isFormatMenuOpen.value = false;
+    isFormatMenuOpen.value = false
   }
 }
 
 function closeMenusOnEscape(event: KeyboardEvent) {
-  if (event.key === "Escape") {
-    closeAllMenus();
+  if (event.key === 'Escape') {
+    closeAllMenus()
   }
 }
 
 type MyIpResponse = {
-  ip?: string;
-  query?: string;
-  city?: string;
-  region?: string;
-  regionName?: string;
-  country?: string;
-  countryCode?: string;
-  org?: string;
-  organization?: string;
-  asOrganization?: string;
-  connection?: { isp?: string };
-};
+  ip?: string
+  query?: string
+  city?: string
+  region?: string
+  regionName?: string
+  country?: string
+  countryCode?: string
+  org?: string
+  organization?: string
+  asOrganization?: string
+  connection?: { isp?: string }
+}
 
 function applyMyIp(data: MyIpResponse) {
-  myip.asOrganization = data?.asOrganization || data?.org || data?.organization || data?.connection?.isp || "Unavailable";
-  myip.ip = data?.ip || data?.query || "Unavailable";
-  myip.city = data?.city || "";
-  myip.region = data?.region || data?.regionName || "";
-  myip.country = data?.country || data?.countryCode || "";
+  myip.asOrganization =
+    data?.asOrganization ||
+    data?.org ||
+    data?.organization ||
+    data?.connection?.isp ||
+    'Unavailable'
+  myip.ip = data?.ip || data?.query || 'Unavailable'
+  myip.city = data?.city || ''
+  myip.region = data?.region || data?.regionName || ''
+  myip.country = data?.country || data?.countryCode || ''
 }
 
 function normalizeMyIpPayload(payload: unknown): MyIpResponse {
-  if (typeof payload === "object" && payload !== null) return payload as MyIpResponse;
-  if (typeof payload === "string") {
+  if (typeof payload === 'object' && payload !== null) return payload as MyIpResponse
+  if (typeof payload === 'string') {
     try {
-      return JSON.parse(payload);
+      return JSON.parse(payload)
     } catch {
-      return {};
+      return {}
     }
   }
-  return {};
+  return {}
 }
 
 function applyUnavailableMyIp() {
-  myip.asOrganization = "Unavailable";
-  myip.ip = "Unavailable";
-  myip.city = "";
-  myip.region = "";
-  myip.country = "";
+  myip.asOrganization = 'Unavailable'
+  myip.ip = 'Unavailable'
+  myip.city = ''
+  myip.region = ''
+  myip.country = ''
 }
 
 async function loadMyIp() {
   try {
-    const primaryRaw = await $fetch(`${config.public.apiBase}/api/v1/myip`, { cache: "no-cache" });
-    const primary = normalizeMyIpPayload(primaryRaw);
+    const primaryRaw = await $fetch(`${config.public.apiBase}/api/v1/myip`, { cache: 'no-cache' })
+    const primary = normalizeMyIpPayload(primaryRaw)
 
     if (primary?.ip || primary?.query) {
-      applyMyIp(primary);
-      return;
+      applyMyIp(primary)
+      return
     }
   } catch {}
 
-  applyUnavailableMyIp();
+  applyUnavailableMyIp()
 }
 
 function getTempProxies() {
-  let proxiesTemp = proxies.value;
+  let proxiesTemp = proxies.value
 
   if (displaySelected.value) {
-    proxiesTemp = proxiesTemp.filter((proxy) => selectedProxies.getSelectedProxies.includes(`${proxy.ip}:${proxy.port}`));
+    proxiesTemp = proxiesTemp.filter(proxy =>
+      selectedProxies.getSelectedProxies.includes(`${proxy.ip}:${proxy.port}`)
+    )
   }
 
   if (selectedCountry.value.length === 2) {
-    proxiesTemp = proxiesTemp.filter((proxy) => proxy.country.toString() === selectedCountry.value.toLowerCase());
+    proxiesTemp = proxiesTemp.filter(
+      proxy => proxy.country.toString() === selectedCountry.value.toLowerCase()
+    )
   }
 
   if (search.value) {
-    proxiesTemp = proxiesTemp.filter((proxy) => proxy.isp.toString().toLowerCase().includes(search.value.toLowerCase()));
+    proxiesTemp = proxiesTemp.filter(proxy =>
+      proxy.isp.toString().toLowerCase().includes(search.value.toLowerCase())
+    )
   }
 
-  return proxiesTemp;
+  return proxiesTemp
 }
 
 async function copyToClipboard() {
   try {
-    const selectedProxyItems = proxies.value.filter((proxy) => selectedProxies.getSelectedProxies.includes(`${proxy.ip}:${proxy.port}`));
-    const configResult = await parseProxies(selectedProxyItems, proxySettings);
-    await navigator.clipboard.writeText(configResult);
-    noticeText.value = "Proxy copied to clipboard!";
-    noticeTone.value = "success";
-    isNoticeOpen.value = true;
+    const selectedProxyItems = proxies.value.filter(proxy =>
+      selectedProxies.getSelectedProxies.includes(`${proxy.ip}:${proxy.port}`)
+    )
+    const configResult = await parseProxies(selectedProxyItems, proxySettings)
+    await navigator.clipboard.writeText(configResult)
+    noticeText.value = 'Proxy copied to clipboard!'
+    noticeTone.value = 'success'
+    isNoticeOpen.value = true
   } catch {
-    noticeText.value = "Failed to copy proxy config.";
-    noticeTone.value = "error";
-    isNoticeOpen.value = true;
+    noticeText.value = 'Failed to copy proxy config.'
+    noticeTone.value = 'error'
+    isNoticeOpen.value = true
   }
 }
 
 watch([selectedCountry, displaySelected, search], () => {
-  page.value = 1;
-});
+  page.value = 1
+})
 
 watch([page, proxies, selectedCountry, displaySelected, search], () => {
-  setPagination();
-  setDisplayProxies();
-});
+  setPagination()
+  setDisplayProxies()
+})
 
 watch([isNoticeOpen], () => {
-  if (!isNoticeOpen.value) return;
+  if (!isNoticeOpen.value) return
 
   setTimeout(() => {
-    isNoticeOpen.value = false;
-  }, 2600);
-});
+    isNoticeOpen.value = false
+  }, 2600)
+})
 
 if (import.meta.client) {
-  loadMyIp();
+  loadMyIp()
 }
 
 onMounted(() => {
-  if (!import.meta.client) return;
-  document.addEventListener("pointerdown", closeMenusOnOutsideClick);
-  document.addEventListener("keydown", closeMenusOnEscape);
-});
+  if (!import.meta.client) return
+  document.addEventListener('pointerdown', closeMenusOnOutsideClick)
+  document.addEventListener('keydown', closeMenusOnEscape)
+})
 
 onBeforeUnmount(() => {
-  if (!import.meta.client) return;
-  document.removeEventListener("pointerdown", closeMenusOnOutsideClick);
-  document.removeEventListener("keydown", closeMenusOnEscape);
-});
+  if (!import.meta.client) return
+  document.removeEventListener('pointerdown', closeMenusOnOutsideClick)
+  document.removeEventListener('keydown', closeMenusOnEscape)
+})
 
-const { data: proxyData, error } = await useFetch<string>(config.public.githubProxyUrl);
+const { data: proxyData, error } = await useFetch<string>(config.public.githubProxyUrl)
 
 if (error.value) {
-  loadError.value = "Failed to load proxy list";
-  isLoading.value = false;
+  loadError.value = 'Failed to load proxy list'
+  isLoading.value = false
 } else if (proxyData.value) {
-  const proxiesTemp: ProxyItem[] = [];
-  const countriesTemp: string[] = [];
+  const proxiesTemp: ProxyItem[] = []
+  const countriesTemp: string[] = []
 
-  for (const data of proxyData.value.split("\n")) {
-    const [ip, port, country, isp] = data.split(",");
-    if (!ip || !port || !country || !isp) continue;
-    proxiesTemp.push({ ip, port, country: country.toLowerCase(), isp });
-    countriesTemp.push(country);
+  for (const data of proxyData.value.split('\n')) {
+    const [ip, port, country, isp] = data.split(',')
+    if (!ip || !port || !country || !isp) continue
+    proxiesTemp.push({ ip, port, country: country.toLowerCase(), isp })
+    countriesTemp.push(country)
   }
 
-  proxies.value = proxiesTemp;
-  countries.value = ["All", ...new Set(countriesTemp)];
-  isLoading.value = false;
+  proxies.value = proxiesTemp
+  countries.value = ['All', ...new Set(countriesTemp)]
+  isLoading.value = false
 }
 
 function setDisplayProxies() {
-  const proxiesTemp = getTempProxies();
-  const startIndex = (page.value - 1) * itemPerPage.value;
-  const endIndex = startIndex + itemPerPage.value;
-  displayProxies.value = proxiesTemp.slice(startIndex, endIndex);
+  const proxiesTemp = getTempProxies()
+  const startIndex = (page.value - 1) * itemPerPage.value
+  const endIndex = startIndex + itemPerPage.value
+  displayProxies.value = proxiesTemp.slice(startIndex, endIndex)
 }
 
 function setPagination() {
-  const proxiesTemp = getTempProxies();
-  const maxPage = Math.max(1, Math.ceil(proxiesTemp.length / itemPerPage.value));
-  const maxItem = 5;
-  const paginationTemp: number[] = [];
+  const proxiesTemp = getTempProxies()
+  const maxPage = Math.max(1, Math.ceil(proxiesTemp.length / itemPerPage.value))
+  const maxItem = 5
+  const paginationTemp: number[] = []
 
-  totalPages.value = maxPage;
+  totalPages.value = maxPage
 
-  if (page.value < 1) page.value = 1;
-  if (page.value > maxPage) page.value = maxPage;
+  if (page.value < 1) page.value = 1
+  if (page.value > maxPage) page.value = maxPage
 
   const startPage =
-    page.value <= 3 ? 1 : page.value + 2 >= maxPage ? Math.max(1, maxPage - 4) : page.value - 2;
+    page.value <= 3 ? 1 : page.value + 2 >= maxPage ? Math.max(1, maxPage - 4) : page.value - 2
 
   for (let i = startPage; i <= maxPage; i++) {
-    paginationTemp.push(i);
-    if (paginationTemp.length >= maxItem) break;
+    paginationTemp.push(i)
+    if (paginationTemp.length >= maxItem) break
   }
 
-  pagination.value = paginationTemp;
+  pagination.value = paginationTemp
 }
 
 function goToPage(targetPage: number) {
   if (targetPage < 1) {
-    page.value = 1;
-    return;
+    page.value = 1
+    return
   }
 
   if (targetPage > totalPages.value) {
-    page.value = totalPages.value;
-    return;
+    page.value = totalPages.value
+    return
   }
 
-  page.value = targetPage;
+  page.value = targetPage
 }
 
 function goToFirstPage() {
-  goToPage(1);
+  goToPage(1)
 }
 
 function goToPreviousPage() {
-  goToPage(page.value - 1);
+  goToPage(page.value - 1)
 }
 
 function goToNextPage() {
-  goToPage(page.value + 1);
+  goToPage(page.value + 1)
 }
 
 function goToLastPage() {
-  goToPage(totalPages.value);
+  goToPage(totalPages.value)
 }
 </script>
 
@@ -359,13 +372,28 @@ function goToLastPage() {
             </div>
           </label>
 
-          <div ref="protocolMenuRef" class="field menu-field" :class="isProtocolMenuOpen ? 'is-open' : ''">
+          <div
+            ref="protocolMenuRef"
+            class="field menu-field"
+            :class="isProtocolMenuOpen ? 'is-open' : ''"
+          >
             <span>Protocol</span>
-            <button type="button" class="field-select" :aria-expanded="isProtocolMenuOpen" aria-haspopup="listbox" @click="toggleProtocolMenu">
+            <button
+              type="button"
+              class="field-select"
+              :aria-expanded="isProtocolMenuOpen"
+              aria-haspopup="listbox"
+              @click="toggleProtocolMenu"
+            >
               <span class="select-text">{{ proxySettings.protocol }}</span>
               <span class="select-caret"><Icon name="uil:angle-down" size="13" /></span>
             </button>
-            <div v-if="isProtocolMenuOpen" class="select-menu settings-menu" role="listbox" aria-label="Select protocol">
+            <div
+              v-if="isProtocolMenuOpen"
+              class="select-menu settings-menu"
+              role="listbox"
+              aria-label="Select protocol"
+            >
               <button
                 v-for="protocol in protocolOptions"
                 :key="protocol"
@@ -381,13 +409,28 @@ function goToLastPage() {
             </div>
           </div>
 
-          <div ref="formatMenuRef" class="field menu-field" :class="isFormatMenuOpen ? 'is-open' : ''">
+          <div
+            ref="formatMenuRef"
+            class="field menu-field"
+            :class="isFormatMenuOpen ? 'is-open' : ''"
+          >
             <span>Format</span>
-            <button type="button" class="field-select" :aria-expanded="isFormatMenuOpen" aria-haspopup="listbox" @click="toggleFormatMenu">
+            <button
+              type="button"
+              class="field-select"
+              :aria-expanded="isFormatMenuOpen"
+              aria-haspopup="listbox"
+              @click="toggleFormatMenu"
+            >
               <span class="select-text">{{ proxySettings.format }}</span>
               <span class="select-caret"><Icon name="uil:angle-down" size="13" /></span>
             </button>
-            <div v-if="isFormatMenuOpen" class="select-menu settings-menu" role="listbox" aria-label="Select format">
+            <div
+              v-if="isFormatMenuOpen"
+              class="select-menu settings-menu"
+              role="listbox"
+              aria-label="Select format"
+            >
               <button
                 v-for="format in formatOptions"
                 :key="format"
@@ -439,7 +482,9 @@ function goToLastPage() {
         </div>
       </div>
 
-      <div class="preview">Effective host: <strong>{{ activeHost }}</strong></div>
+      <div class="preview">
+        Effective host: <strong>{{ activeHost }}</strong>
+      </div>
 
       <div class="settings-actions">
         <form method="dialog">
@@ -475,10 +520,22 @@ function goToLastPage() {
     <div class="control-ribbon">
       <label class="ribbon-input" aria-label="Search provider">
         <Icon name="uil:search" size="14" />
-        <input v-model="search" type="text" placeholder="Search provider" class="input-surface" aria-label="Search by provider name" />
+        <input
+          v-model="search"
+          type="text"
+          placeholder="Search provider"
+          class="input-surface"
+          aria-label="Search by provider name"
+        />
       </label>
 
-      <div ref="countryMenuRef" class="ribbon-select" :class="isCountryMenuOpen ? 'is-open' : ''" role="combobox" aria-label="Filter by country">
+      <div
+        ref="countryMenuRef"
+        class="ribbon-select"
+        :class="isCountryMenuOpen ? 'is-open' : ''"
+        role="combobox"
+        aria-label="Filter by country"
+      >
         <Icon name="uil:globe" size="14" aria-hidden="true" />
         <button
           type="button"
@@ -489,9 +546,16 @@ function goToLastPage() {
           @click="toggleCountryMenu"
         >
           <span class="select-text">{{ selectedCountry }}</span>
-          <span class="select-caret"><Icon name="uil:angle-down" size="13" aria-hidden="true" /></span>
+          <span class="select-caret"
+            ><Icon name="uil:angle-down" size="13" aria-hidden="true"
+          /></span>
         </button>
-        <div v-if="isCountryMenuOpen" class="select-menu" role="listbox" aria-label="Country options">
+        <div
+          v-if="isCountryMenuOpen"
+          class="select-menu"
+          role="listbox"
+          aria-label="Country options"
+        >
           <button
             v-for="country in countries"
             :key="country"
@@ -507,15 +571,24 @@ function goToLastPage() {
         </div>
       </div>
 
-      <button class="panel-button ghost" @click="displaySelected = !displaySelected" :aria-pressed="displaySelected" aria-label="Toggle showing selected proxies only">
+      <button
+        class="panel-button ghost"
+        @click="displaySelected = !displaySelected"
+        :aria-pressed="displaySelected"
+        aria-label="Toggle showing selected proxies only"
+      >
         <Icon name="uil:list-ul" size="14" aria-hidden="true" />
-        {{ displaySelected ? "Show All" : "Only Selected" }}
+        {{ displaySelected ? 'Show All' : 'Only Selected' }}
       </button>
 
       <button class="panel-button" @click="openSettingsDialog" aria-label="Open settings">
         <Icon name="uil:sliders-v-alt" size="14" aria-hidden="true" /> Settings
       </button>
-      <button class="panel-button export" @click="copyToClipboard" aria-label="Export selected proxies">
+      <button
+        class="panel-button export"
+        @click="copyToClipboard"
+        aria-label="Export selected proxies"
+      >
         <Icon name="uil:import" size="14" aria-hidden="true" /> Export
       </button>
     </div>
@@ -532,7 +605,9 @@ function goToLastPage() {
       </div>
 
       <div class="pager">
-        <button class="pager-control pager-nav" :disabled="page === 1" @click="goToFirstPage">First</button>
+        <button class="pager-control pager-nav" :disabled="page === 1" @click="goToFirstPage">
+          First
+        </button>
         <button class="pager-control pager-nav" :disabled="page === 1" @click="goToPreviousPage">
           <Icon name="uil:angle-left" size="13" /> Prev
         </button>
@@ -545,15 +620,32 @@ function goToLastPage() {
         >
           {{ pageIndex }}
         </button>
-        <button class="pager-control pager-nav" :disabled="page === totalPages" @click="goToNextPage">
+        <button
+          class="pager-control pager-nav"
+          :disabled="page === totalPages"
+          @click="goToNextPage"
+        >
           Next <Icon name="uil:angle-right" size="13" />
         </button>
-        <button class="pager-control pager-nav" :disabled="page === totalPages" @click="goToLastPage">Last</button>
+        <button
+          class="pager-control pager-nav"
+          :disabled="page === totalPages"
+          @click="goToLastPage"
+        >
+          Last
+        </button>
       </div>
     </div>
 
-    <div v-if="isNoticeOpen" class="notice-chip" :class="noticeTone === 'error' ? 'is-error' : 'is-success'">
-      <Icon :name="noticeTone === 'error' ? 'uil:exclamation-circle' : 'uil:check-circle'" size="15" />
+    <div
+      v-if="isNoticeOpen"
+      class="notice-chip"
+      :class="noticeTone === 'error' ? 'is-error' : 'is-success'"
+    >
+      <Icon
+        :name="noticeTone === 'error' ? 'uil:exclamation-circle' : 'uil:check-circle'"
+        size="15"
+      />
       {{ noticeText }}
     </div>
   </section>
@@ -580,7 +672,7 @@ function goToLastPage() {
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(1.15rem, 2.3vw, 1.45rem);
   letter-spacing: 0.01em;
 }
@@ -950,7 +1042,6 @@ function goToLastPage() {
   .control-ribbon {
     grid-template-columns: 1fr;
   }
-
 }
 
 .settings-card {
@@ -985,7 +1076,7 @@ function goToLastPage() {
 
 .settings-head h3 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: 1.06rem;
   color: var(--text-main);
 }

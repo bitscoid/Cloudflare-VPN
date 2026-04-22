@@ -1,63 +1,65 @@
 <script setup lang="ts">
-const config = useRuntimeConfig();
-const selectedProxies = useSelectedProxiesStore();
+const config = useRuntimeConfig()
+const selectedProxies = useSelectedProxiesStore()
 const props = defineProps({
   isp: String,
   ipPort: String,
   country: String,
-});
+})
 
 const stats = reactive({
   proxyip: false,
   delay: 0,
   loading: false,
-});
-const isSelected = ref(false);
+})
+const isSelected = ref(false)
 const delayLabel = computed(() => {
-  if (stats.loading) return "Checking";
-  return stats.delay ? `${stats.delay} ms` : "Timeout";
-});
+  if (stats.loading) return 'Checking'
+  return stats.delay ? `${stats.delay} ms` : 'Timeout'
+})
 
 type ProxyCheckResponse = {
-  proxyip: boolean;
-  delay?: number;
-};
+  proxyip: boolean
+  delay?: number
+}
 
 async function checkProxyHealth() {
-  stats.loading = true;
+  stats.loading = true
   try {
-    const res = await $fetch<ProxyCheckResponse>(`${config.public.apiBase}/api/v1/check?ip=${props.ipPort}`);
-    stats.proxyip = res.proxyip;
-    stats.delay = res.delay || 0;
+    const res = await $fetch<ProxyCheckResponse>(
+      `${config.public.apiBase}/api/v1/check?ip=${props.ipPort}`
+    )
+    stats.proxyip = res.proxyip
+    stats.delay = res.delay || 0
   } catch {
-    stats.proxyip = false;
-    stats.delay = 0;
+    stats.proxyip = false
+    stats.delay = 0
   }
-  stats.loading = false;
+  stats.loading = false
 }
 
 function selectProxy() {
-  selectedProxies.toggleSelectedProxies(props.ipPort as string);
-  toggleIsSelected();
+  selectedProxies.toggleSelectedProxies(props.ipPort as string)
+  toggleIsSelected()
 }
 
 function toggleIsSelected() {
-  isSelected.value = selectedProxies.getSelectedProxies.includes(props.ipPort as string);
+  isSelected.value = selectedProxies.getSelectedProxies.includes(props.ipPort as string)
 }
 
 onMounted(() => {
-  checkProxyHealth();
-  toggleIsSelected();
-});
+  checkProxyHealth()
+  toggleIsSelected()
+})
 
 watch(props, () => {
-  checkProxyHealth();
-  toggleIsSelected();
-});
+  checkProxyHealth()
+  toggleIsSelected()
+})
 
 watch(selectedProxies.getSelectedProxies, () => {
-  toggleIsSelected();
-});
+  toggleIsSelected()
+})
 </script>
 
 <template>
@@ -67,7 +69,12 @@ watch(selectedProxies.getSelectedProxies, () => {
         <Icon :name="isSelected ? 'uil:check' : 'uil:plus'" size="12" />
       </span>
 
-      <img class="flag" :src="`${config.public.flagCdn}/${props.country}.svg`" :alt="`Flag of ${props.country}`" loading="lazy" />
+      <img
+        class="flag"
+        :src="`${config.public.flagCdn}/${props.country}.svg`"
+        :alt="`Flag of ${props.country}`"
+        loading="lazy"
+      />
 
       <span class="info-chip isp-chip">
         <strong>{{ props.isp }}</strong>
@@ -86,7 +93,11 @@ watch(selectedProxies.getSelectedProxies, () => {
     </button>
 
     <button class="probe-btn" type="button" :disabled="stats.loading" @click="checkProxyHealth()">
-      <Icon :name="stats.loading ? 'uil:spinner-alt' : 'uil:sync'" size="13" :class="stats.loading ? 'spin' : ''" />
+      <Icon
+        :name="stats.loading ? 'uil:spinner-alt' : 'uil:sync'"
+        size="13"
+        :class="stats.loading ? 'spin' : ''"
+      />
     </button>
   </article>
 </template>
@@ -102,7 +113,10 @@ watch(selectedProxies.getSelectedProxies, () => {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.38rem;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .proxy-card:hover {
@@ -113,7 +127,9 @@ watch(selectedProxies.getSelectedProxies, () => {
 
 .proxy-card.selected {
   border-color: rgba(79, 140, 255, 0.85);
-  box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.45), 0 10px 28px rgba(13, 36, 80, 0.26);
+  box-shadow:
+    inset 0 0 0 1px rgba(79, 140, 255, 0.45),
+    0 10px 28px rgba(13, 36, 80, 0.26);
 }
 
 .proxy-main {

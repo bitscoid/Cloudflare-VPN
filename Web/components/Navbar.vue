@@ -1,13 +1,13 @@
 <script setup lang="ts">
-const route = useRoute();
+const route = useRoute()
 
 const routerPaths = [
-  { name: "Build", path: "/build", icon: "uil:wrench" },
-  { name: "Convert", path: "/convert", icon: "uil:sync" },
-  { name: "Monitor", path: "/monitor", icon: "uil:chart-line" },
-];
+  { name: 'Build', path: '/build', icon: 'uil:wrench' },
+  { name: 'Convert', path: '/convert', icon: 'uil:sync' },
+  { name: 'Monitor', path: '/monitor', icon: 'uil:chart-line' },
+]
 
-const isOpen = ref(false);
+const isOpen = ref(false)
 </script>
 
 <template>
@@ -105,7 +105,7 @@ const isOpen = ref(false);
 }
 
 .brand-copy strong {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   color: var(--text-main);
   font-size: 0.98rem;
   letter-spacing: 0.02em;
@@ -133,7 +133,10 @@ const isOpen = ref(false);
   border-radius: 0.7rem;
   padding: 0.4rem 0.68rem;
   color: var(--text-soft);
-  transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .nav-link:hover,

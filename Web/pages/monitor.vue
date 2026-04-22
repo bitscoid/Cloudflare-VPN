@@ -1,155 +1,162 @@
 <script setup lang="ts">
-import prettyBytes from "pretty-bytes";
+import prettyBytes from 'pretty-bytes'
 
 definePageMeta({
-  title: "Monitor",
-});
+  title: 'Monitor',
+})
 
-const config = useRuntimeConfig();
-const refreshInterval = ref(2);
+const config = useRuntimeConfig()
+const refreshInterval = ref(2)
 const serverList = ref([
   {
-    url: "vpn.bits.co.id",
+    url: 'vpn.bits.co.id',
     ping: [] as Array<{ delay: number; date: Date }>,
     info: {} as ServerInfo,
     status: {} as ServerStatus,
     speed: {} as ServerSpeed,
     errors: [] as string[],
   },
-]);
-const intervalIds: ReturnType<typeof setInterval>[] = [];
+])
+const intervalIds: ReturnType<typeof setInterval>[] = []
 
 type ServerInfo = {
-  org?: string;
-  [key: string]: unknown;
-};
+  org?: string
+  [key: string]: unknown
+}
 
 type ServerStatus = {
-  nic?: Array<{ bytesSent?: number; bytesRecv?: number }>;
-  cpu?: string[];
-  [key: string]: unknown;
-};
+  nic?: Array<{ bytesSent?: number; bytesRecv?: number }>
+  cpu?: string[]
+  [key: string]: unknown
+}
 
 type ServerSpeed = {
-  upload?: number;
-  download?: number;
-};
+  upload?: number
+  download?: number
+}
 
-async function fetchServerData<T>(server: string, endpoint: string): Promise<{ error: false; result: T } | { error: true; message: string }> {
+async function fetchServerData<T>(
+  server: string,
+  endpoint: string
+): Promise<{ error: false; result: T } | { error: true; message: string }> {
   try {
-    const res = await fetch(`https://${server}/api/v1/${endpoint}`);
+    const res = await fetch(`https://${server}/api/v1/${endpoint}`)
     if (res.status === 200) {
-      return { error: false, result: await res.json() as T };
+      return { error: false, result: (await res.json()) as T }
     }
-    throw new Error(res.statusText);
+    throw new Error(res.statusText)
   } catch (e: Error) {
-    return { error: true, message: e.message };
+    return { error: true, message: e.message }
   }
 }
 
 async function getServerPing(server: string) {
-  const startTime = Date.now();
-  const res = await fetchServerData<null>(server, "ping");
-  const finishTime = Date.now();
+  const startTime = Date.now()
+  const res = await fetchServerData<null>(server, 'ping')
+  const finishTime = Date.now()
   if (!res.error) {
-    return { error: false, result: finishTime - startTime };
+    return { error: false, result: finishTime - startTime }
   }
-  return res;
+  return res
 }
 
 async function getServerInfo(server: string) {
-  return fetchServerData(server, "info");
+  return fetchServerData(server, 'info')
 }
 
 async function getServerStatus(server: string) {
-  return fetchServerData(server, "status");
+  return fetchServerData(server, 'status')
 }
 
 function latestPingDelay(server: any) {
-  const lastPing = server.ping?.[server.ping.length - 1];
-  return typeof lastPing?.delay === "number" ? lastPing.delay : null;
+  const lastPing = server.ping?.[server.ping.length - 1]
+  return typeof lastPing?.delay === 'number' ? lastPing.delay : null
 }
 
 function pingStateClass(server: any) {
-  const delay = latestPingDelay(server);
-  if (delay === null) return "status-idle";
-  if (delay <= 150) return "status-good";
-  if (delay <= 350) return "status-warn";
-  return "status-bad";
+  const delay = latestPingDelay(server)
+  if (delay === null) return 'status-idle'
+  if (delay <= 150) return 'status-good'
+  if (delay <= 350) return 'status-warn'
+  return 'status-bad'
 }
 
 function pingLabel(server: any) {
-  const delay = latestPingDelay(server);
-  return delay === null ? "--" : `${delay} ms`;
+  const delay = latestPingDelay(server)
+  return delay === null ? '--' : `${delay} ms`
 }
 
 function cpuLabel(server: any) {
-  const rawCpu = Number(server.status?.cpu?.[0]);
-  return Number.isFinite(rawCpu) ? `${Math.round(rawCpu)}%` : "0%";
+  const rawCpu = Number(server.status?.cpu?.[0])
+  return Number.isFinite(rawCpu) ? `${Math.round(rawCpu)}%` : '0%'
 }
 
 function ramLabel(server: any) {
-  return server.status?.mem ? prettyBytes(server.status.mem.used) : "--";
+  return server.status?.mem ? prettyBytes(server.status.mem.used) : '--'
 }
 
 function speedLabel(speed: number | undefined) {
-  return speed && speed > 0 ? `${prettyBytes(speed)}/s` : "--";
+  return speed && speed > 0 ? `${prettyBytes(speed)}/s` : '--'
 }
 
 onMounted(async () => {
   for (const server of serverList.value) {
-    getServerInfo(server.url).then((res) => {
+    getServerInfo(server.url).then(res => {
       if (res.error) {
-        server.errors.unshift(res.message);
-        return;
+        server.errors.unshift(res.message)
+        return
       }
-      server.info = res.result;
-    });
+      server.info = res.result
+    })
 
-    intervalIds.push(setInterval(() => {
-      for (const item of serverList.value) {
-        if (item.errors.length) item.errors.pop();
-      }
-    }, 5000));
-
-    intervalIds.push(setInterval(async () => {
-      getServerStatus(server.url).then((res) => {
-        if (res.error) {
-          server.errors.unshift(res.message);
-          return;
+    intervalIds.push(
+      setInterval(() => {
+        for (const item of serverList.value) {
+          if (item.errors.length) item.errors.pop()
         }
+      }, 5000)
+    )
 
-        const currentSent = res.result.nic?.[0]?.bytesSent ?? 0;
-        const currentRecv = res.result.nic?.[0]?.bytesRecv ?? 0;
-        const previousSent = server.status.nic?.[0]?.bytesSent ?? currentSent;
-        const previousRecv = server.status.nic?.[0]?.bytesRecv ?? currentRecv;
+    intervalIds.push(
+      setInterval(async () => {
+        getServerStatus(server.url).then(res => {
+          if (res.error) {
+            server.errors.unshift(res.message)
+            return
+          }
 
-        server.speed.upload = Math.max(0, (currentSent - previousSent) / refreshInterval.value);
-        server.speed.download = Math.max(0, (currentRecv - previousRecv) / refreshInterval.value);
-        server.status = res.result;
-      });
+          const currentSent = res.result.nic?.[0]?.bytesSent ?? 0
+          const currentRecv = res.result.nic?.[0]?.bytesRecv ?? 0
+          const previousSent = server.status.nic?.[0]?.bytesSent ?? currentSent
+          const previousRecv = server.status.nic?.[0]?.bytesRecv ?? currentRecv
 
-      getServerPing(server.url).then((res) => {
-        if (res.error) {
-          server.errors.unshift(res.message);
-        }
+          server.speed.upload = Math.max(0, (currentSent - previousSent) / refreshInterval.value)
+          server.speed.download = Math.max(0, (currentRecv - previousRecv) / refreshInterval.value)
+          server.status = res.result
+        })
 
-        server.ping.push({
-          delay: res.result ? res.result : 0,
-          date: new Date(),
-        });
+        getServerPing(server.url).then(res => {
+          if (res.error) {
+            server.errors.unshift(res.message)
+          }
 
-        if (server.ping.length > 24) {
-          server.ping.shift();
-        }
-      });
-    }, refreshInterval.value * 1000));
+          server.ping.push({
+            delay: res.result ? res.result : 0,
+            date: new Date(),
+          })
+
+          if (server.ping.length > 24) {
+            server.ping.shift()
+          }
+        })
+      }, refreshInterval.value * 1000)
+    )
   }
-});
+})
 
 onBeforeUnmount(() => {
-  intervalIds.forEach((id) => clearInterval(id));
-});
+  intervalIds.forEach(id => clearInterval(id))
+})
 </script>
 
 <template>
@@ -160,33 +167,64 @@ onBeforeUnmount(() => {
         <span>Monitor</span>
       </h1>
       <div class="head-pills" aria-label="Monitor statistics">
-        <span class="refresh-pill"><Icon name="uil:history" size="13" aria-hidden="true" /> {{ refreshInterval }}s</span>
-        <span class="refresh-pill"><Icon name="uil:server-network" size="13" aria-hidden="true" /> {{ serverList.length }}</span>
+        <span class="refresh-pill"
+          ><Icon name="uil:history" size="13" aria-hidden="true" /> {{ refreshInterval }}s</span
+        >
+        <span class="refresh-pill"
+          ><Icon name="uil:server-network" size="13" aria-hidden="true" />
+          {{ serverList.length }}</span
+        >
       </div>
     </div>
 
-    <Card v-for="(server, idx) in serverList" :key="server.url" role="article" :aria-label="`Server ${server.url}`">
+    <Card
+      v-for="(server, idx) in serverList"
+      :key="server.url"
+      role="article"
+      :aria-label="`Server ${server.url}`"
+    >
       <div class="monitor-row" :style="{ animationDelay: `${idx * 0.1}s` }">
         <div class="endpoint-cell">
           <div class="endpoint-provider-row">
-            <div class="endpoint-pill"><Icon name="uil:server-network" size="14" aria-hidden="true" /> <span class="endpoint-name">{{ server.url }}</span></div>
-            <div class="provider-pill"><Icon name="uil:building" size="12" aria-hidden="true" /> <span class="provider-name">{{ server.info.org || "Loading provider..." }}</span></div>
+            <div class="endpoint-pill">
+              <Icon name="uil:server-network" size="14" aria-hidden="true" />
+              <span class="endpoint-name">{{ server.url }}</span>
+            </div>
+            <div class="provider-pill">
+              <Icon name="uil:building" size="12" aria-hidden="true" />
+              <span class="provider-name">{{ server.info.org || 'Loading provider...' }}</span>
+            </div>
           </div>
         </div>
 
         <div class="metric-cluster" role="group" aria-label="Server metrics">
-          <div class="mini-pill" aria-label="CPU usage"><Icon name="uil:processor" size="12" aria-hidden="true" /> {{ cpuLabel(server) }}</div>
-          <div class="mini-pill" aria-label="Memory usage"><Icon name="uil:database" size="12" aria-hidden="true" /> {{ ramLabel(server) }}</div>
-          <div class="mini-pill" aria-label="Upload speed"><Icon name="uil:upload" size="12" aria-hidden="true" /> {{ speedLabel(server.speed.upload) }}</div>
-          <div class="mini-pill" aria-label="Download speed"><Icon name="uil:download-alt" size="12" aria-hidden="true" /> {{ speedLabel(server.speed.download) }}</div>
-          <div class="mini-pill ping-pill" :class="pingStateClass(server)" aria-label="Ping latency">
+          <div class="mini-pill" aria-label="CPU usage">
+            <Icon name="uil:processor" size="12" aria-hidden="true" /> {{ cpuLabel(server) }}
+          </div>
+          <div class="mini-pill" aria-label="Memory usage">
+            <Icon name="uil:database" size="12" aria-hidden="true" /> {{ ramLabel(server) }}
+          </div>
+          <div class="mini-pill" aria-label="Upload speed">
+            <Icon name="uil:upload" size="12" aria-hidden="true" />
+            {{ speedLabel(server.speed.upload) }}
+          </div>
+          <div class="mini-pill" aria-label="Download speed">
+            <Icon name="uil:download-alt" size="12" aria-hidden="true" />
+            {{ speedLabel(server.speed.download) }}
+          </div>
+          <div
+            class="mini-pill ping-pill"
+            :class="pingStateClass(server)"
+            aria-label="Ping latency"
+          >
             <span class="dot" aria-hidden="true"></span>
             <Icon name="uil:wifi" size="12" aria-hidden="true" /> {{ pingLabel(server) }}
           </div>
         </div>
 
         <div v-if="server.errors.length" class="error-pill" role="alert" aria-live="polite">
-          <Icon name="uil:exclamation-triangle" size="15" aria-hidden="true" /> {{ server.errors[0] }}
+          <Icon name="uil:exclamation-triangle" size="15" aria-hidden="true" />
+          {{ server.errors[0] }}
         </div>
       </div>
     </Card>
@@ -218,7 +256,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   font-size: clamp(1.15rem, 2.3vw, 1.45rem);
   letter-spacing: 0.01em;
 }
