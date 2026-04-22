@@ -1,4 +1,5 @@
 <script setup lang="ts">
+const config = useRuntimeConfig();
 const selectedProxies = useSelectedProxiesStore();
 const props = defineProps({
   isp: String,
@@ -17,13 +18,17 @@ const delayLabel = computed(() => {
   return stats.delay ? `${stats.delay} ms` : "Timeout";
 });
 
+type ProxyCheckResponse = {
+  proxyip: boolean;
+  delay?: number;
+};
+
 async function checkProxyHealth() {
   stats.loading = true;
   try {
-    const res = await $fetch(`https://vpn.bits.co.id/api/v1/check?ip=${props.ipPort}`);
-    const jsonValue = res as any;
-    stats.proxyip = jsonValue.proxyip;
-    stats.delay = jsonValue.delay || 0;
+    const res = await $fetch<ProxyCheckResponse>(`${config.public.apiBase}/api/v1/check?ip=${props.ipPort}`);
+    stats.proxyip = res.proxyip;
+    stats.delay = res.delay || 0;
   } catch {
     stats.proxyip = false;
     stats.delay = 0;
@@ -62,7 +67,7 @@ watch(selectedProxies.getSelectedProxies, () => {
         <Icon :name="isSelected ? 'uil:check' : 'uil:plus'" size="12" />
       </span>
 
-      <img class="flag" :src="`https://hatscripts.github.io/circle-flags/flags/${props.country}.svg`" :alt="props.country" />
+      <img class="flag" :src="`${config.public.flagCdn}/${props.country}.svg`" :alt="`Flag of ${props.country}`" loading="lazy" />
 
       <span class="info-chip isp-chip">
         <strong>{{ props.isp }}</strong>

@@ -107,4 +107,36 @@ body {
   opacity: 0;
   transform: translateY(12px) scale(0.99);
 }
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseIcon {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2), 0 0 0 rgba(79, 140, 255, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.34), 0 0 14px rgba(79, 140, 255, 0.26);
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 </style>

@@ -1,4 +1,5 @@
 import { getFlagEmoji } from "./string";
+import { useRuntimeConfig } from "#imports";
 
 const vlessTemplate =
   "vless://fc60147e-76b8-4bc5-b691-90b2da79e3d2@support.zoom.us:443?encryption=none&type=ws&host=vpn.bits.co.id&security=tls&sni=vpn.bits.co.id&path=%2F172.232.239.151-587#1%20%F0%9F%87%AE%F0%9F%87%A9%20Akamai%20Connected%20Cloud%20WS%20TLS%20[vpn]";
@@ -71,13 +72,11 @@ class ParseProxies {
     }
 
     if (configTemplate) {
-      // Preprocess config
       configTemplate.hostname = this.settings.server;
       if (!this.settings.tls) {
         configTemplate.port = "80";
       }
 
-      // Assign proxies
       for (const proxy of this.proxies) {
         let config = configTemplate;
         let configSearchParams = config?.searchParams;
@@ -103,9 +102,7 @@ class ParseProxies {
           configSearchParams?.set("sni", effectiveHost);
         }
 
-        config.hash = `${getFlagEmoji(proxy.country)} ${proxy.isp} WS ${this.settings.tls ? "TLS" : "NTLS"} [${
-          proxy.ip
-        }]`;
+        config.hash = `${getFlagEmoji(proxy.country)} ${proxy.isp} - ${proxy.ip}`;
 
         config.search = configSearchParams.toString();
         results.push(config.toString());
@@ -115,10 +112,10 @@ class ParseProxies {
     return results.join("\n");
   }
 
-  // clash or mihomo
   async toClash() {
+    const config = useRuntimeConfig();
     const proxies = this.toRaw();
-    const res = await fetch("https://vpn.bits.co.id/convert", {
+    const res = await fetch(`${config.public.apiBase}/convert`, {
       method: "post",
       body: JSON.stringify({
         url: proxies.split("\n").join(","),
@@ -130,8 +127,9 @@ class ParseProxies {
   }
 
   async toProvider() {
+    const config = useRuntimeConfig();
     const proxies = this.toRaw();
-    const res = await fetch("https://vpn.bits.co.id/convert", {
+    const res = await fetch(`${config.public.apiBase}/convert`, {
       method: "post",
       body: JSON.stringify({
         url: proxies.split("\n").join(","),

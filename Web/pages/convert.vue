@@ -3,6 +3,7 @@ definePageMeta({
   title: "Convert",
 });
 
+const config = useRuntimeConfig();
 const rawProxies = ref("");
 const convertedProxies = ref("");
 const convertFormats = ref(["clash", "provider"]);
@@ -11,6 +12,7 @@ const activeFormat = ref("clash");
 const isNoticeOpen = ref(false);
 const noticeText = ref("");
 const noticeTone = ref<"success" | "error">("success");
+const errorMessage = ref("");
 
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -26,10 +28,16 @@ function showNotice(text: string, tone: "success" | "error") {
 }
 
 async function convertProxiesTo(format: string) {
+  if (!rawProxies.value.trim()) {
+    showNotice("Please enter proxy URLs first", "error");
+    return;
+  }
+
   isLoading.value = true;
   activeFormat.value = format;
+  errorMessage.value = "";
   try {
-    const res = await fetch("https://vpn.bits.co.id/convert", {
+    const res = await fetch(`${config.public.apiBase}/convert`, {
       method: "post",
       body: JSON.stringify({
         url: rawProxies.value.split("\n").join(","),
@@ -37,9 +45,13 @@ async function convertProxiesTo(format: string) {
       }),
     });
 
+    if (!res.ok) {
+      throw new Error(`Server error: ${res.status}`);
+    }
     convertedProxies.value = await res.text();
-  } catch (e: any) {
-    convertedProxies.value = e.message;
+  } catch (e: Error) {
+    errorMessage.value = e.message;
+    showNotice("Conversion failed", "error");
   } finally {
     isLoading.value = false;
   }
@@ -68,38 +80,39 @@ onBeforeUnmount(() => {
   <section class="tool-shell">
     <div class="head-row">
       <h1 class="view-title">
-        <span class="view-icon"><Icon name="uil:sync" size="14" /></span>
+        <span class="view-icon"><Icon name="uil:sync" size="14" aria-hidden="true" /></span>
         <span>Convert</span>
       </h1>
     </div>
 
     <div class="workspace-card">
       <section class="editor-panel">
-        <p class="panel-label"><Icon name="uil:link-alt" size="13" /> Raw URL</p>
-        <textarea v-model="rawProxies" class="surface" placeholder="vless://..."></textarea>
+        <p class="panel-label"><Icon name="uil:link-alt" size="13" aria-hidden="true" /> Raw URL</p>
+        <textarea v-model="rawProxies" class="surface" placeholder="vless://..." aria-label="Enter proxy URLs to convert"></textarea>
       </section>
 
-      <div class="control-stack">
+      <div class="control-stack" role="group" aria-label="Conversion options">
         <button
           v-for="format in convertFormats"
           :key="format"
           class="format-pill"
           :class="[`format-${format}`, activeFormat === format ? 'active' : '']"
           :disabled="isLoading"
+          :aria-busy="isLoading && activeFormat === format"
           @click="convertProxiesTo(format)"
         >
-          <Icon :name="format === 'clash' ? 'uil:rocket' : 'uil:server-network'" size="13" />
+          <Icon :name="format === 'clash' ? 'uil:rocket' : 'uil:server-network'" size="13" aria-hidden="true" />
           {{ isLoading && activeFormat === format ? "Running..." : format.toUpperCase() }}
         </button>
 
-        <button class="format-pill format-copy" @click="copyToClipboard">
-          <Icon name="uil:copy" size="13" /> Copy
+        <button class="format-pill format-copy" @click="copyToClipboard" aria-label="Copy converted result">
+          <Icon name="uil:copy" size="13" aria-hidden="true" /> Copy
         </button>
       </div>
 
       <section class="editor-panel">
-        <p class="panel-label"><Icon name="uil:file-alt" size="13" /> Result</p>
-        <textarea :value="convertedProxies" class="surface" placeholder="result..." readonly></textarea>
+        <p class="panel-label"><Icon name="uil:file-alt" size="13" aria-hidden="true" /> Result</p>
+        <textarea :value="convertedProxies || errorMessage" class="surface" :placeholder="errorMessage || 'result...'" readonly aria-label="Converted result" :aria-invalid="!!errorMessage"></textarea>
       </section>
     </div>
 
@@ -293,27 +306,6 @@ onBeforeUnmount(() => {
   .surface {
     min-height: clamp(110px, 20vh, 170px);
     font-size: 0.83rem;
-  }
-}
-
-@keyframes reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulseIcon {
-  0%,
-  100% {
-    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2), 0 0 0 rgba(79, 140, 255, 0);
-  }
-  50% {
-    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.34), 0 0 14px rgba(79, 140, 255, 0.26);
   }
 }
 </style>

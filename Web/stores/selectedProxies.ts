@@ -2,19 +2,16 @@ export const useSelectedProxiesStore = defineStore("selectedProxies", () => {
   const selectedProxiesCookie = useCookie("selected-proxies");
   const selectedProxies = ref<string[]>([]);
 
-  // Check stored cookies
   if (selectedProxiesCookie.value) {
     try {
       selectedProxies.value = atob(selectedProxiesCookie.value).split(",");
-    } catch (e: any) {
-      console.error(e.message);
+    } catch (e: Error) {
+      console.error("Failed to parse selected proxies cookie:", e.message);
     }
   }
 
-  // Getters
   const getSelectedProxies = computed(() => selectedProxies.value);
 
-  // Setters
   function toggleSelectedProxies(id: string) {
     if (selectedProxies.value.includes(id)) {
       selectedProxies.value.splice(selectedProxies.value.indexOf(id), 1);

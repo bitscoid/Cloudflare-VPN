@@ -3,6 +3,7 @@ definePageMeta({
   title: "Build",
 });
 
+const config = useRuntimeConfig();
 const route = useRoute();
 const selectedProxies = useSelectedProxiesStore();
 
@@ -37,6 +38,13 @@ const isNoticeOpen = ref(false);
 const noticeText = ref("");
 const noticeTone = ref<"success" | "error">("success");
 const search = ref("");
+const settingsDialogRef = ref<HTMLDialogElement | null>(null);
+const isLoading = ref(true);
+const loadError = ref("");
+
+function openSettingsDialog() {
+  settingsDialogRef.value?.showModal();
+}
 
 const proxySettings = reactive<ProxySettings>({
   protocol: "trojan",
@@ -122,7 +130,21 @@ function closeMenusOnEscape(event: KeyboardEvent) {
   }
 }
 
-function applyMyIp(data: any) {
+type MyIpResponse = {
+  ip?: string;
+  query?: string;
+  city?: string;
+  region?: string;
+  regionName?: string;
+  country?: string;
+  countryCode?: string;
+  org?: string;
+  organization?: string;
+  asOrganization?: string;
+  connection?: { isp?: string };
+};
+
+function applyMyIp(data: MyIpResponse) {
   myip.asOrganization = data?.asOrganization || data?.org || data?.organization || data?.connection?.isp || "Unavailable";
   myip.ip = data?.ip || data?.query || "Unavailable";
   myip.city = data?.city || "";
@@ -130,14 +152,16 @@ function applyMyIp(data: any) {
   myip.country = data?.country || data?.countryCode || "";
 }
 
-function normalizeMyIpPayload(payload: any) {
-  if (typeof payload !== "string") return payload;
-
-  try {
-    return JSON.parse(payload);
-  } catch {
-    return {};
+function normalizeMyIpPayload(payload: unknown): MyIpResponse {
+  if (typeof payload === "object" && payload !== null) return payload as MyIpResponse;
+  if (typeof payload === "string") {
+    try {
+      return JSON.parse(payload);
+    } catch {
+      return {};
+    }
   }
+  return {};
 }
 
 function applyUnavailableMyIp() {
@@ -150,11 +174,11 @@ function applyUnavailableMyIp() {
 
 async function loadMyIp() {
   try {
-    const primaryRaw = await $fetch("https://vpn.bits.co.id/api/v1/myip", { cache: "no-cache" });
+    const primaryRaw = await $fetch(`${config.public.apiBase}/api/v1/myip`, { cache: "no-cache" });
     const primary = normalizeMyIpPayload(primaryRaw);
 
-    if ((primary as any)?.ip || (primary as any)?.query) {
-      applyMyIp(primary as any);
+    if (primary?.ip || primary?.query) {
+      applyMyIp(primary);
       return;
     }
   } catch {}
@@ -182,11 +206,9 @@ function getTempProxies() {
 
 async function copyToClipboard() {
   try {
-    const configResult = await parseProxies(
-      proxies.value.filter((proxy) => selectedProxies.getSelectedProxies.includes(`${proxy.ip}:${proxy.port}`)) as any,
-      proxySettings,
-    );
-    await navigator.clipboard.writeText(configResult as string);
+    const selectedProxyItems = proxies.value.filter((proxy) => selectedProxies.getSelectedProxies.includes(`${proxy.ip}:${proxy.port}`));
+    const configResult = await parseProxies(selectedProxyItems, proxySettings);
+    await navigator.clipboard.writeText(configResult);
     noticeText.value = "Proxy copied to clipboard!";
     noticeTone.value = "success";
     isNoticeOpen.value = true;
@@ -230,22 +252,26 @@ onBeforeUnmount(() => {
   document.removeEventListener("keydown", closeMenusOnEscape);
 });
 
-useFetch("https://raw.githubusercontent.com/bitscoid/Cloudflare-VPN/refs/heads/main/Proxy/proxyList.txt").then((res) => {
-  if (res.status.value === "success") {
-    const proxiesTemp: ProxyItem[] = [];
-    const countriesTemp: string[] = [];
+const { data: proxyData, error } = await useFetch<string>(config.public.githubProxyUrl);
 
-    for (const data of (res.data.value as string).split("\n")) {
-      const [ip, port, country, isp] = data.split(",");
-      if (!ip || !port || !country || !isp) continue;
-      proxiesTemp.push({ ip, port, country: country.toLowerCase(), isp });
-      countriesTemp.push(country);
-    }
+if (error.value) {
+  loadError.value = "Failed to load proxy list";
+  isLoading.value = false;
+} else if (proxyData.value) {
+  const proxiesTemp: ProxyItem[] = [];
+  const countriesTemp: string[] = [];
 
-    proxies.value = proxiesTemp;
-    countries.value = ["All", ...new Set(countriesTemp)];
+  for (const data of proxyData.value.split("\n")) {
+    const [ip, port, country, isp] = data.split(",");
+    if (!ip || !port || !country || !isp) continue;
+    proxiesTemp.push({ ip, port, country: country.toLowerCase(), isp });
+    countriesTemp.push(country);
   }
-});
+
+  proxies.value = proxiesTemp;
+  countries.value = ["All", ...new Set(countriesTemp)];
+  isLoading.value = false;
+}
 
 function setDisplayProxies() {
   const proxiesTemp = getTempProxies();
@@ -308,7 +334,7 @@ function goToLastPage() {
 </script>
 
 <template>
-  <dialog id="settings_dialog" class="settings-dialog">
+  <dialog ref="settingsDialogRef" class="settings-dialog">
     <div class="settings-card">
       <div class="settings-head">
         <h3>Profile Settings</h3>
@@ -447,24 +473,25 @@ function goToLastPage() {
     </div>
 
     <div class="control-ribbon">
-      <label class="ribbon-input">
+      <label class="ribbon-input" aria-label="Search provider">
         <Icon name="uil:search" size="14" />
-        <input v-model="search" type="text" placeholder="Search provider" class="input-surface" />
+        <input v-model="search" type="text" placeholder="Search provider" class="input-surface" aria-label="Search by provider name" />
       </label>
 
-      <div ref="countryMenuRef" class="ribbon-select" :class="isCountryMenuOpen ? 'is-open' : ''">
-        <Icon name="uil:globe" size="14" />
+      <div ref="countryMenuRef" class="ribbon-select" :class="isCountryMenuOpen ? 'is-open' : ''" role="combobox" aria-label="Filter by country">
+        <Icon name="uil:globe" size="14" aria-hidden="true" />
         <button
           type="button"
           class="select-surface"
           :aria-expanded="isCountryMenuOpen"
           aria-haspopup="listbox"
+          aria-label="Select country"
           @click="toggleCountryMenu"
         >
           <span class="select-text">{{ selectedCountry }}</span>
-          <span class="select-caret"><Icon name="uil:angle-down" size="13" /></span>
+          <span class="select-caret"><Icon name="uil:angle-down" size="13" aria-hidden="true" /></span>
         </button>
-        <div v-if="isCountryMenuOpen" class="select-menu" role="listbox" aria-label="Select country">
+        <div v-if="isCountryMenuOpen" class="select-menu" role="listbox" aria-label="Country options">
           <button
             v-for="country in countries"
             :key="country"
@@ -480,14 +507,16 @@ function goToLastPage() {
         </div>
       </div>
 
-      <button class="panel-button ghost" @click="displaySelected = !displaySelected">
-        <Icon name="uil:list-ul" size="14" />
+      <button class="panel-button ghost" @click="displaySelected = !displaySelected" :aria-pressed="displaySelected" aria-label="Toggle showing selected proxies only">
+        <Icon name="uil:list-ul" size="14" aria-hidden="true" />
         {{ displaySelected ? "Show All" : "Only Selected" }}
       </button>
 
-      <button class="panel-button" onclick="settings_dialog.showModal()"><Icon name="uil:sliders-v-alt" size="14" /> Settings</button>
-      <button class="panel-button export" @click="copyToClipboard">
-        <Icon name="uil:import" size="14" /> Export
+      <button class="panel-button" @click="openSettingsDialog" aria-label="Open settings">
+        <Icon name="uil:sliders-v-alt" size="14" aria-hidden="true" /> Settings
+      </button>
+      <button class="panel-button export" @click="copyToClipboard" aria-label="Export selected proxies">
+        <Icon name="uil:import" size="14" aria-hidden="true" /> Export
       </button>
     </div>
 
@@ -924,16 +953,6 @@ function goToLastPage() {
 
 }
 
-@keyframes pulseIcon {
-  0%,
-  100% {
-    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2), 0 0 0 rgba(79, 140, 255, 0);
-  }
-  50% {
-    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.34), 0 0 14px rgba(79, 140, 255, 0.26);
-  }
-}
-
 .settings-card {
   border: 1px solid rgba(120, 154, 210, 0.28);
   background:
@@ -1089,17 +1108,6 @@ function goToLastPage() {
 
   .settings-actions .panel-button {
     width: 100%;
-  }
-}
-
-@keyframes reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 </style>

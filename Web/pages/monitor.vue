@@ -5,73 +5,64 @@ definePageMeta({
   title: "Monitor",
 });
 
+const config = useRuntimeConfig();
 const refreshInterval = ref(2);
 const serverList = ref([
   {
     url: "vpn.bits.co.id",
     ping: [] as Array<{ delay: number; date: Date }>,
-    info: {} as any,
-    status: {} as any,
-    speed: {} as any,
+    info: {} as ServerInfo,
+    status: {} as ServerStatus,
+    speed: {} as ServerSpeed,
     errors: [] as string[],
   },
 ]);
+const intervalIds: ReturnType<typeof setInterval>[] = [];
 
-async function getServerPing(server: string) {
+type ServerInfo = {
+  org?: string;
+  [key: string]: unknown;
+};
+
+type ServerStatus = {
+  nic?: Array<{ bytesSent?: number; bytesRecv?: number }>;
+  cpu?: string[];
+  [key: string]: unknown;
+};
+
+type ServerSpeed = {
+  upload?: number;
+  download?: number;
+};
+
+async function fetchServerData<T>(server: string, endpoint: string): Promise<{ error: false; result: T } | { error: true; message: string }> {
   try {
-    const startTime = Date.now();
-    const res = await fetch(`https://${server}/api/v1/ping`);
-    const finishTime = Date.now();
-
-    if (res.status == 200) {
-      return {
-        error: false,
-        result: finishTime - startTime,
-      };
+    const res = await fetch(`https://${server}/api/v1/${endpoint}`);
+    if (res.status === 200) {
+      return { error: false, result: await res.json() as T };
     }
     throw new Error(res.statusText);
-  } catch (e: any) {
-    return {
-      error: true,
-      message: e.message,
-    };
+  } catch (e: Error) {
+    return { error: true, message: e.message };
   }
+}
+
+async function getServerPing(server: string) {
+  const startTime = Date.now();
+  const res = await fetchServerData<null>(server, "ping");
+  const finishTime = Date.now();
+  if (!res.error) {
+    return { error: false, result: finishTime - startTime };
+  }
+  return res;
 }
 
 async function getServerInfo(server: string) {
-  try {
-    const res = await fetch(`https://${server}/api/v1/info`);
-    if (res.status == 200) {
-      return {
-        error: false,
-        result: await res.json(),
-      };
-    }
-    throw new Error(res.statusText);
-  } catch (e: any) {
-    return {
-      error: true,
-      message: e.message,
-    };
-  }
+  return fetchServerData(server, "info");
 }
 
 async function getServerStatus(server: string) {
-  try {
-    const res = await fetch(`https://${server}/api/v1/status`);
-    if (res.status == 200) {
-      return {
-        error: false,
-        result: await res.json(),
-      };
-    }
-    throw new Error(res.statusText);
-  } catch (e: any) {
-    return {
-      error: true,
-      message: e.message,
-    };
-  }
+  return fetchServerData(server, "status");
 }
 
 function latestPingDelay(server: any) {
@@ -115,13 +106,13 @@ onMounted(async () => {
       server.info = res.result;
     });
 
-    setInterval(() => {
+    intervalIds.push(setInterval(() => {
       for (const item of serverList.value) {
         if (item.errors.length) item.errors.pop();
       }
-    }, 5000);
+    }, 5000));
 
-    setInterval(async () => {
+    intervalIds.push(setInterval(async () => {
       getServerStatus(server.url).then((res) => {
         if (res.error) {
           server.errors.unshift(res.message);
@@ -152,46 +143,50 @@ onMounted(async () => {
           server.ping.shift();
         }
       });
-    }, refreshInterval.value * 1000);
+    }, refreshInterval.value * 1000));
   }
+});
+
+onBeforeUnmount(() => {
+  intervalIds.forEach((id) => clearInterval(id));
 });
 </script>
 
 <template>
-  <section class="uptime-shell">
+  <section class="uptime-shell" aria-label="Server monitor">
     <div class="head-row">
       <h1 class="view-title">
-        <span class="view-icon"><Icon name="uil:chart-line" size="14" /></span>
+        <span class="view-icon"><Icon name="uil:chart-line" size="14" aria-hidden="true" /></span>
         <span>Monitor</span>
       </h1>
-      <div class="head-pills">
-        <span class="refresh-pill"><Icon name="uil:history" size="13" /> {{ refreshInterval }}s</span>
-        <span class="refresh-pill"><Icon name="uil:server-network" size="13" /> {{ serverList.length }}</span>
+      <div class="head-pills" aria-label="Monitor statistics">
+        <span class="refresh-pill"><Icon name="uil:history" size="13" aria-hidden="true" /> {{ refreshInterval }}s</span>
+        <span class="refresh-pill"><Icon name="uil:server-network" size="13" aria-hidden="true" /> {{ serverList.length }}</span>
       </div>
     </div>
 
-    <Card v-for="(server, idx) in serverList" :key="server.url">
+    <Card v-for="(server, idx) in serverList" :key="server.url" role="article" :aria-label="`Server ${server.url}`">
       <div class="monitor-row" :style="{ animationDelay: `${idx * 0.1}s` }">
         <div class="endpoint-cell">
           <div class="endpoint-provider-row">
-            <div class="endpoint-pill"><Icon name="uil:server-network" size="14" /> <span class="endpoint-name">{{ server.url }}</span></div>
-            <div class="provider-pill"><Icon name="uil:building" size="12" /> <span class="provider-name">{{ server.info.org || "Loading provider..." }}</span></div>
+            <div class="endpoint-pill"><Icon name="uil:server-network" size="14" aria-hidden="true" /> <span class="endpoint-name">{{ server.url }}</span></div>
+            <div class="provider-pill"><Icon name="uil:building" size="12" aria-hidden="true" /> <span class="provider-name">{{ server.info.org || "Loading provider..." }}</span></div>
           </div>
         </div>
 
-        <div class="metric-cluster">
-          <div class="mini-pill"><Icon name="uil:processor" size="12" /> {{ cpuLabel(server) }}</div>
-          <div class="mini-pill"><Icon name="uil:database" size="12" /> {{ ramLabel(server) }}</div>
-          <div class="mini-pill"><Icon name="uil:upload" size="12" /> {{ speedLabel(server.speed.upload) }}</div>
-          <div class="mini-pill"><Icon name="uil:download-alt" size="12" /> {{ speedLabel(server.speed.download) }}</div>
-          <div class="mini-pill ping-pill" :class="pingStateClass(server)">
-            <span class="dot"></span>
-            <Icon name="uil:wifi" size="12" /> {{ pingLabel(server) }}
+        <div class="metric-cluster" role="group" aria-label="Server metrics">
+          <div class="mini-pill" aria-label="CPU usage"><Icon name="uil:processor" size="12" aria-hidden="true" /> {{ cpuLabel(server) }}</div>
+          <div class="mini-pill" aria-label="Memory usage"><Icon name="uil:database" size="12" aria-hidden="true" /> {{ ramLabel(server) }}</div>
+          <div class="mini-pill" aria-label="Upload speed"><Icon name="uil:upload" size="12" aria-hidden="true" /> {{ speedLabel(server.speed.upload) }}</div>
+          <div class="mini-pill" aria-label="Download speed"><Icon name="uil:download-alt" size="12" aria-hidden="true" /> {{ speedLabel(server.speed.download) }}</div>
+          <div class="mini-pill ping-pill" :class="pingStateClass(server)" aria-label="Ping latency">
+            <span class="dot" aria-hidden="true"></span>
+            <Icon name="uil:wifi" size="12" aria-hidden="true" /> {{ pingLabel(server) }}
           </div>
         </div>
 
-        <div v-if="server.errors.length" class="error-pill">
-          <Icon name="uil:exclamation-triangle" size="15" /> {{ server.errors[0] }}
+        <div v-if="server.errors.length" class="error-pill" role="alert" aria-live="polite">
+          <Icon name="uil:exclamation-triangle" size="15" aria-hidden="true" /> {{ server.errors[0] }}
         </div>
       </div>
     </Card>
@@ -453,37 +448,4 @@ onMounted(async () => {
     font-size: 0.69rem;
   }
 }
-
-@keyframes reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulseIcon {
-  0%,
-  100% {
-    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.2), 0 0 0 rgba(79, 140, 255, 0);
-  }
-  50% {
-    box-shadow: inset 0 0 0 1px rgba(79, 140, 255, 0.34), 0 0 14px rgba(79, 140, 255, 0.26);
-  }
-}
-
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 </style>
