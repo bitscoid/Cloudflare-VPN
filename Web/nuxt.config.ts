@@ -9,6 +9,18 @@ export default defineNuxtConfig({
   ssr: false,
   nitro: {
     preset: "static",
+    compressPublicAssets: true,
+  },
+  vite: {
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vue: ["vue", "vue-router", "pinia"],
+          },
+        },
+      },
+    },
   },
   runtimeConfig: {
     public: {
@@ -22,7 +34,8 @@ export default defineNuxtConfig({
       link: [
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" },
-        { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" },
+        { rel: "preload", href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap", as: "style", onload: "this.onload=null;this.rel='stylesheet'" },
+        { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap", media: "print", onload: "this.media='all'" },
       ],
     },
   },
