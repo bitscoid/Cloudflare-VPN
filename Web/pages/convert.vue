@@ -3,7 +3,8 @@ definePageMeta({
   title: 'Convert',
 })
 
-const config = useRuntimeConfig()
+import { buildClashConfig, buildClashProviderConfig } from '~/utils/proxy'
+
 const rawProxies = ref('')
 const convertedProxies = ref('')
 const convertFormats = ref(['clash', 'provider'])
@@ -37,18 +38,12 @@ async function convertProxiesTo(format: string) {
   activeFormat.value = format
   errorMessage.value = ''
   try {
-    const res = await fetch(`${config.public.apiBase}/convert`, {
-      method: 'post',
-      body: JSON.stringify({
-        url: rawProxies.value.split('\n').join(','),
-        format,
-      }),
-    })
-
-    if (!res.ok) {
-      throw new Error(`Server error: ${res.status}`)
+    const serialized = rawProxies.value.split('\n').join(',')
+    if (format === 'provider') {
+      convertedProxies.value = buildClashProviderConfig(serialized)
+    } else {
+      convertedProxies.value = buildClashConfig(serialized)
     }
-    convertedProxies.value = await res.text()
   } catch (e: Error) {
     errorMessage.value = e.message
     showNotice('Conversion failed', 'error')

@@ -1,12 +1,6 @@
 import { getFlagEmoji } from './string'
-import { useRuntimeConfig } from '#imports'
-
 const vlessTemplate =
   'vless://fc60147e-76b8-4bc5-b691-90b2da79e3d2@support.zoom.us:443?encryption=none&type=ws&host=vpn.bits.co.id&security=tls&sni=vpn.bits.co.id&path=%2F172.232.239.151-587#1%20%F0%9F%87%AE%F0%9F%87%A9%20Akamai%20Connected%20Cloud%20WS%20TLS%20[vpn]'
-const trojanTemplate =
-  'trojan://86768774-70b2-4c15-80c3-02066fb1e3b6@support.zoom.us:443?encryption=none&type=ws&host=vpn.bits.co.id&security=tls&sni=vpn.bits.co.id&path=%2F35.219.50.99-443#1%20%F0%9F%87%AE%F0%9F%87%A9%20Google%20Cloud%20WS%20TLS%20[vpn]'
-const ssTemplate =
-  'ss://bm9uZTpkMDIzMmM1NS1kZjE0LTRjMzMtYTMxOS1jNGM1NTVmMmIwZjQ%3D@support.zoom.us:443?plugin=v2ray-plugin%3Btls%3Bmux%3D0%3Bmode%3Dwebsocket%3Bpath%3D%2F43.218.77.16-1443%3Bhost%3Dvpn.bits.co.id#1%20%F0%9F%87%AE%F0%9F%87%A9%20Amazon.com%20WS%20TLS%20[vpn]'
 
 type proxyType = {
   ip: string
@@ -14,7 +8,7 @@ type proxyType = {
   port: string
   country: string
 }
-type protocolsType = 'trojan' | 'vless' | 'ss'
+type protocolsType = 'vless'
 export type ProxySettings = {
   server: string
   host: string
@@ -25,11 +19,149 @@ export type ProxySettings = {
 }
 
 export function getProtocols() {
-  return ['trojan', 'vless', 'ss']
+  return ['vless']
 }
 
 export function getFormats() {
   return ['mihomo', 'clash', 'provider', 'raw']
+}
+
+function decodeURIComponentSafe(value = '') {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+function yamlQuote(value = '') {
+  return `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+function parseRawProxy(rawUrl: string, index: number) {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    return null
+  }
+
+  const protocol = parsed.protocol.replace(':', '')
+  const name = decodeURIComponentSafe(parsed.hash?.slice(1) || `${protocol.toUpperCase()}-${index + 1}`)
+  const base = {
+    name,
+    server: parsed.hostname,
+    port: Number.parseInt(parsed.port || '443'),
+    network: parsed.searchParams.get('type') || 'tcp',
+    path: parsed.searchParams.get('path') || '/',
+    host: parsed.searchParams.get('host') || '',
+    sni: parsed.searchParams.get('sni') || '',
+    tls: parsed.searchParams.get('security') === 'tls',
+  }
+
+  if (protocol === 'vless') {
+    return {
+      ...base,
+      type: 'vless',
+      uuid: decodeURIComponentSafe(parsed.username),
+      cipher: parsed.searchParams.get('encryption') || 'none',
+    }
+  }
+
+  return null
+}
+
+function parseRawProxyList(rawUrls = '') {
+  const entries = rawUrls
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean)
+
+  const proxies = entries
+    .map((entry, index) => parseRawProxy(entry, index))
+    .filter(entry => entry && entry.server && entry.port)
+
+  if (!proxies.length) {
+    throw new Error('configs not found')
+  }
+
+  return proxies
+}
+
+export function buildClashConfig(rawUrls = '') {
+  const proxies = parseRawProxyList(rawUrls)
+  const lines = ['mixed-port: 7890', 'allow-lan: false', 'mode: rule', 'log-level: info', '', 'proxies:']
+
+  for (const proxy of proxies) {
+    lines.push(`  - name: ${yamlQuote(proxy.name)}`)
+    lines.push(`    type: ${proxy.type}`)
+    lines.push(`    server: ${proxy.server}`)
+    lines.push(`    port: ${proxy.port}`)
+    lines.push(`    uuid: ${yamlQuote(proxy.uuid)}`)
+    lines.push(`    cipher: ${yamlQuote(proxy.cipher)}`)
+    lines.push('    udp: true')
+
+    if (proxy.network === 'ws') {
+      lines.push('    network: ws')
+      if (proxy.tls) {
+        lines.push('    tls: true')
+      }
+      if (proxy.sni) {
+        lines.push(`    servername: ${yamlQuote(proxy.sni)}`)
+      }
+      lines.push('    ws-opts:')
+      lines.push(`      path: ${yamlQuote(proxy.path || '/')}`)
+      if (proxy.host) {
+        lines.push('      headers:')
+        lines.push(`        Host: ${yamlQuote(proxy.host)}`)
+      }
+    }
+  }
+
+  lines.push('', 'proxy-groups:', `  - name: ${yamlQuote('Auto')}`, '    type: select', '    proxies:')
+  for (const proxy of proxies) {
+    lines.push(`      - ${yamlQuote(proxy.name)}`)
+  }
+
+  lines.push('', 'rules:', '  - MATCH,Auto')
+  return lines.join('\n')
+}
+
+export function buildClashProviderConfig(rawUrls = '') {
+  const proxies = parseRawProxyList(rawUrls)
+  const lines = ['proxies:']
+
+  for (const proxy of proxies) {
+    lines.push(`  - name: ${yamlQuote(proxy.name)}`)
+    lines.push(`    server: ${yamlQuote(proxy.server)}`)
+    lines.push(`    port: ${proxy.port}`)
+    lines.push(`    type: ${proxy.type}`)
+    lines.push(`    uuid: ${yamlQuote(proxy.uuid)}`)
+    lines.push('    cipher: auto')
+
+    if (proxy.tls) {
+      lines.push('    tls: true')
+      lines.push('    skip-cert-verify: true')
+    }
+
+    if (proxy.sni) {
+      lines.push(`    servername: ${yamlQuote(proxy.sni)}`)
+    }
+
+    if (proxy.network === 'ws') {
+      lines.push('    network: ws')
+      lines.push('    ws-opts:')
+      lines.push(`      path: ${yamlQuote(proxy.path || '/')}`)
+      if (proxy.host) {
+        lines.push('      headers:')
+        lines.push(`        Host: ${yamlQuote(proxy.host)}`)
+      }
+    }
+
+    lines.push('    udp: true')
+  }
+
+  return lines.join('\n')
 }
 
 export async function parseProxies(proxies: proxyType[], settings: ProxySettings) {
@@ -57,56 +189,23 @@ class ParseProxies {
 
   toRaw() {
     const results: string[] = []
-    let configTemplate: URL | undefined | null
-
-    switch (this.settings.protocol) {
-      case 'trojan':
-        configTemplate = URL.parse(trojanTemplate)
-        break
-      case 'vless':
-        configTemplate = URL.parse(vlessTemplate)
-        break
-      case 'ss':
-        configTemplate = URL.parse(ssTemplate)
-        break
-    }
+    const configTemplate = URL.parse(vlessTemplate)
 
     if (configTemplate) {
-      configTemplate.hostname = this.settings.server
-      if (!this.settings.tls) {
-        configTemplate.port = '80'
-      }
-
       for (const proxy of this.proxies) {
-        let config = configTemplate
-        let configSearchParams = config?.searchParams
+        const config = new URL(configTemplate.toString())
+        const configSearchParams = config.searchParams
+        const effectiveHost = this.settings.wildcard
+          ? `${this.settings.server}.${this.settings.host}`
+          : this.settings.host
 
-        if (config.protocol == 'ss:') {
-          let ssPlugin: string[] = (configSearchParams.get('plugin') as string)?.split(';')
-          const effectiveHost = this.settings.wildcard
-            ? `${this.settings.server}.${this.settings.host}`
-            : this.settings.host
-
-          ssPlugin = ssPlugin?.map(key =>
-            key.startsWith('path') ? `path=/${proxy.ip}-${proxy.port}` : key
-          )
-          ssPlugin = ssPlugin?.map(key => (key.startsWith('host') ? `host=${effectiveHost}` : key))
-
-          if (!this.settings.tls) {
-            ssPlugin?.splice(ssPlugin.indexOf('tls'), 1)
-          }
-          configSearchParams.set('plugin', ssPlugin?.join(';'))
-        } else {
-          configSearchParams?.set('path', `/${proxy.ip}-${proxy.port}`)
-          if (!this.settings.tls) {
-            configSearchParams?.set('security', 'none')
-          }
-          const effectiveHost = this.settings.wildcard
-            ? `${this.settings.server}.${this.settings.host}`
-            : this.settings.host
-          configSearchParams?.set('host', effectiveHost)
-          configSearchParams?.set('sni', effectiveHost)
-        }
+        config.protocol = 'vless:'
+        config.hostname = this.settings.server
+        config.port = this.settings.tls ? '443' : '80'
+        configSearchParams.set('path', `/${proxy.ip}-${proxy.port}`)
+        configSearchParams.set('security', this.settings.tls ? 'tls' : 'none')
+        configSearchParams.set('host', effectiveHost)
+        configSearchParams.set('sni', this.settings.tls ? effectiveHost : '')
 
         config.hash = `${getFlagEmoji(proxy.country)} ${proxy.isp} - ${proxy.ip}`
 
@@ -118,31 +217,13 @@ class ParseProxies {
     return results.join('\n')
   }
 
-  async toClash() {
-    const config = useRuntimeConfig()
+  toClash() {
     const proxies = this.toRaw()
-    const res = await fetch(`${config.public.apiBase}/convert`, {
-      method: 'post',
-      body: JSON.stringify({
-        url: proxies.split('\n').join(','),
-        format: 'clash',
-      }),
-    })
-
-    return await res.text()
+    return buildClashConfig(proxies.split('\n').join(','))
   }
 
-  async toProvider() {
-    const config = useRuntimeConfig()
+  toProvider() {
     const proxies = this.toRaw()
-    const res = await fetch(`${config.public.apiBase}/convert`, {
-      method: 'post',
-      body: JSON.stringify({
-        url: proxies.split('\n').join(','),
-        format: 'provider',
-      }),
-    })
-
-    return await res.text()
+    return buildClashProviderConfig(proxies.split('\n').join(','))
   }
 }

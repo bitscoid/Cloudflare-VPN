@@ -1,84 +1,59 @@
 <script setup lang="ts">
-import prettyBytes from 'pretty-bytes'
-
 definePageMeta({
   title: 'Monitor',
 })
 
-const config = useRuntimeConfig()
-const refreshInterval = ref(2)
+const refreshInterval = ref(5)
 const serverList = ref([
   {
     url: 'vpn.bits.co.id',
     ping: [] as Array<{ delay: number; date: Date }>,
-    info: {} as ServerInfo,
-    status: {} as ServerStatus,
-    speed: {} as ServerSpeed,
+    status: 'Checking' as 'Checking' | 'Online' | 'Offline',
+    provider: 'Browser probe',
+    lastCheckedAt: null as Date | null,
     errors: [] as string[],
   },
 ])
 const intervalIds: ReturnType<typeof setInterval>[] = []
 
-type ServerInfo = {
-  org?: string
-  [key: string]: unknown
-}
-
-type ServerStatus = {
-  nic?: Array<{ bytesSent?: number; bytesRecv?: number }>
-  cpu?: string[]
-  [key: string]: unknown
-}
-
-type ServerSpeed = {
-  upload?: number
-  download?: number
-}
-
-async function fetchServerData<T>(
-  server: string,
-  endpoint: string
-): Promise<{ error: false; result: T } | { error: true; message: string }> {
-  try {
-    const res = await fetch(`https://${server}/api/v1/${endpoint}`)
-    const text = await res.text()
-    if (res.status === 200) {
-      try {
-        return { error: false, result: JSON.parse(text) as T }
-      } catch {
-        return { error: false, result: text as unknown as T }
-      }
-    }
-    throw new Error(res.statusText)
-  } catch (e: Error) {
-    return { error: true, message: e.message }
-  }
-}
-
-async function getServerPing(server: string) {
+async function probeServer(server: (typeof serverList.value)[number]) {
   const startTime = Date.now()
-  const res = await fetchServerData<null>(server, 'ping')
-  const finishTime = Date.now()
-  if (!res.error) {
-    return { error: false, result: finishTime - startTime }
+
+  try {
+    await fetch(`https://${server.url}/`, {
+      method: 'GET',
+      cache: 'no-store',
+      mode: 'no-cors',
+    })
+
+    const delay = Date.now() - startTime
+    server.status = 'Online'
+    server.lastCheckedAt = new Date()
+    server.ping.push({ delay, date: new Date() })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Request failed'
+    server.status = 'Offline'
+    server.lastCheckedAt = new Date()
+    server.errors.unshift(message)
+    server.ping.push({ delay: 0, date: new Date() })
   }
-  return res
-}
 
-async function getServerInfo(server: string) {
-  return fetchServerData(server, 'info')
-}
+  if (server.errors.length > 4) {
+    server.errors = server.errors.slice(0, 4)
+  }
 
-async function getServerStatus(server: string) {
-  return fetchServerData(server, 'status')
+  if (server.ping.length > 24) {
+    server.ping.shift()
+  }
 }
 
 function latestPingDelay(server: any) {
   const lastPing = server.ping?.[server.ping.length - 1]
-  return typeof lastPing?.delay === 'number' ? lastPing.delay : null
+  return typeof lastPing?.delay === 'number' && lastPing.delay > 0 ? lastPing.delay : null
 }
 
 function pingStateClass(server: any) {
+  if (server.status === 'Offline') return 'status-bad'
   const delay = latestPingDelay(server)
   if (delay === null) return 'status-idle'
   if (delay <= 150) return 'status-good'
@@ -88,72 +63,30 @@ function pingStateClass(server: any) {
 
 function pingLabel(server: any) {
   const delay = latestPingDelay(server)
+  if (server.status === 'Offline') return 'Offline'
   return delay === null ? '--' : `${delay} ms`
 }
 
-function cpuLabel(server: any) {
-  const rawCpu = Number(server.status?.cpu?.[0])
-  return Number.isFinite(rawCpu) ? `${Math.round(rawCpu)}%` : '0%'
-}
+function lastCheckedLabel(server: any) {
+  if (!server.lastCheckedAt) return 'Waiting...'
 
-function ramLabel(server: any) {
-  return server.status?.mem ? prettyBytes(server.status.mem.used) : '--'
-}
-
-function speedLabel(speed: number | undefined) {
-  return speed && speed > 0 ? `${prettyBytes(speed)}/s` : '--'
+  const secondsAgo = Math.max(0, Math.round((Date.now() - server.lastCheckedAt.getTime()) / 1000))
+  return `${secondsAgo}s ago`
 }
 
 onMounted(async () => {
   for (const server of serverList.value) {
-    getServerInfo(server.url).then(res => {
-      if (res.error) {
-        server.errors.unshift(res.message)
-        return
-      }
-      server.info = res.result
-    })
+    await probeServer(server)
 
     intervalIds.push(
       setInterval(() => {
-        for (const item of serverList.value) {
-          if (item.errors.length) item.errors.pop()
-        }
+        if (server.errors.length) server.errors.pop()
       }, 5000)
     )
 
     intervalIds.push(
-      setInterval(async () => {
-        getServerStatus(server.url).then(res => {
-          if (res.error) {
-            server.errors.unshift(res.message)
-            return
-          }
-
-          const currentSent = res.result.nic?.[0]?.bytesSent ?? 0
-          const currentRecv = res.result.nic?.[0]?.bytesRecv ?? 0
-          const previousSent = server.status.nic?.[0]?.bytesSent ?? currentSent
-          const previousRecv = server.status.nic?.[0]?.bytesRecv ?? currentRecv
-
-          server.speed.upload = Math.max(0, (currentSent - previousSent) / refreshInterval.value)
-          server.speed.download = Math.max(0, (currentRecv - previousRecv) / refreshInterval.value)
-          server.status = res.result
-        })
-
-        getServerPing(server.url).then(res => {
-          if (res.error) {
-            server.errors.unshift(res.message)
-          }
-
-          server.ping.push({
-            delay: res.result ? res.result : 0,
-            date: new Date(),
-          })
-
-          if (server.ping.length > 24) {
-            server.ping.shift()
-          }
-        })
+      setInterval(() => {
+        probeServer(server)
       }, refreshInterval.value * 1000)
     )
   }
@@ -196,26 +129,19 @@ onBeforeUnmount(() => {
               <span class="endpoint-name">{{ server.url }}</span>
             </div>
             <div class="provider-pill">
-              <Icon name="uil:building" size="12" aria-hidden="true" />
-              <span class="provider-name">{{ server.info.org || 'Loading provider...' }}</span>
+              <Icon name="uil:desktop-cloud-alt" size="12" aria-hidden="true" />
+              <span class="provider-name">{{ server.provider }}</span>
             </div>
           </div>
         </div>
 
         <div class="metric-cluster" role="group" aria-label="Server metrics">
-          <div class="mini-pill" aria-label="CPU usage">
-            <Icon name="uil:processor" size="12" aria-hidden="true" /> {{ cpuLabel(server) }}
+          <div class="mini-pill" aria-label="Current status">
+            <Icon name="uil:heartbeat" size="12" aria-hidden="true" /> {{ server.status }}
           </div>
-          <div class="mini-pill" aria-label="Memory usage">
-            <Icon name="uil:database" size="12" aria-hidden="true" /> {{ ramLabel(server) }}
-          </div>
-          <div class="mini-pill" aria-label="Upload speed">
-            <Icon name="uil:upload" size="12" aria-hidden="true" />
-            {{ speedLabel(server.speed.upload) }}
-          </div>
-          <div class="mini-pill" aria-label="Download speed">
-            <Icon name="uil:download-alt" size="12" aria-hidden="true" />
-            {{ speedLabel(server.speed.download) }}
+          <div class="mini-pill" aria-label="Last checked time">
+            <Icon name="uil:clock" size="12" aria-hidden="true" />
+            {{ lastCheckedLabel(server) }}
           </div>
           <div
             class="mini-pill ping-pill"
@@ -300,7 +226,7 @@ onBeforeUnmount(() => {
 .monitor-row {
   padding: 0.65rem 0.72rem;
   display: grid;
-  grid-template-columns: minmax(200px, 1.2fr) minmax(420px, 2.2fr);
+  grid-template-columns: minmax(200px, 1.2fr) minmax(320px, 2fr);
   align-items: center;
   gap: 0.45rem;
   min-width: 0;
@@ -358,137 +284,88 @@ onBeforeUnmount(() => {
 .endpoint-name,
 .provider-name {
   min-width: 0;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metric-cluster {
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
   min-width: 0;
-  gap: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.32rem;
+  flex-wrap: wrap;
 }
 
 .mini-pill {
-  border: 1px solid rgba(148, 163, 184, 0.24);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 9999px;
-  padding: 0.22rem 0.5rem;
+  background: rgba(9, 12, 21, 0.7);
+  color: var(--text-soft);
+  padding: 0.24rem 0.52rem;
   font-size: 0.72rem;
-  color: var(--text-main);
-  background: rgba(9, 11, 18, 0.68);
   display: inline-flex;
   align-items: center;
   gap: 0.22rem;
-  min-width: 0;
-  white-space: nowrap;
 }
 
 .ping-pill {
-  color: var(--text-main);
+  color: #d7e6ff;
 }
 
-.dot {
+.ping-pill .dot {
   width: 0.42rem;
   height: 0.42rem;
   border-radius: 9999px;
-  background: #6a7282;
+  background: currentColor;
+  box-shadow: 0 0 0 0.22rem rgba(255, 255, 255, 0.05);
 }
 
 .status-good {
-  border-color: rgba(74, 222, 128, 0.42);
-  background: rgba(34, 197, 94, 0.16);
-}
-
-.status-good .dot {
-  background: #4ade80;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(74, 222, 128, 0.12);
+  color: #c9ffd8;
 }
 
 .status-warn {
-  border-color: rgba(251, 191, 36, 0.42);
-  background: rgba(245, 158, 11, 0.16);
-}
-
-.status-warn .dot {
-  background: #fbbf24;
-  box-shadow: 0 0 8px rgba(251, 191, 36, 0.52);
+  border-color: rgba(251, 191, 36, 0.45);
+  background: rgba(251, 191, 36, 0.12);
+  color: #ffe8af;
 }
 
 .status-bad {
-  border-color: rgba(248, 113, 113, 0.42);
-  background: rgba(239, 68, 68, 0.16);
-}
-
-.status-bad .dot {
-  background: #f87171;
-  box-shadow: 0 0 8px rgba(248, 113, 113, 0.52);
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.12);
+  color: #ffd2d2;
 }
 
 .status-idle {
-  border-color: rgba(148, 163, 184, 0.25);
-  background: rgba(71, 85, 105, 0.16);
+  border-color: rgba(148, 163, 184, 0.32);
+  color: var(--text-soft);
 }
 
 .error-pill {
   grid-column: 1 / -1;
-  border: 1px solid rgba(255, 99, 132, 0.4);
-  background: rgba(255, 70, 90, 0.08);
-  color: #ffc9d2;
-  border-radius: 0.62rem;
-  padding: 0.32rem 0.5rem;
-  font-size: 0.74rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.18);
+  color: #fecaca;
+  padding: 0.42rem 0.56rem;
+  font-size: 0.74rem;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 900px) {
   .monitor-row {
     grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .metric-cluster {
-    flex-wrap: wrap;
     justify-content: flex-start;
-  }
-}
-
-@media (max-width: 1180px) {
-  .metric-cluster {
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-}
-
-@media (max-width: 760px) {
-  .head-row {
-    flex-wrap: wrap;
-    justify-content: center;
-    margin: 0.35rem 0 0.75rem;
-  }
-
-  .head-pills {
-    position: static;
-    width: 100%;
-    justify-content: center;
-  }
-
-  .endpoint-provider-row {
-    flex-wrap: wrap;
-  }
-
-  .endpoint-pill,
-  .provider-pill {
-    max-width: 100%;
-    flex: 1 1 auto;
-  }
-
-  .endpoint-pill,
-  .provider-pill,
-  .mini-pill {
-    font-size: 0.69rem;
   }
 }
 </style>

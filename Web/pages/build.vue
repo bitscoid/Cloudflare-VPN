@@ -26,8 +26,6 @@ const proxies = ref<ProxyItem[]>([])
 const countries = ref<string[]>([])
 const selectedCountry = ref('All')
 const isCountryMenuOpen = ref(false)
-const isProtocolMenuOpen = ref(false)
-const isFormatMenuOpen = ref(false)
 const displayProxies = ref<ProxyItem[]>([])
 const page = ref(1)
 const itemPerPage = ref(10)
@@ -47,7 +45,7 @@ function openSettingsDialog() {
 }
 
 const proxySettings = reactive<ProxySettings>({
-  protocol: 'trojan',
+  protocol: 'vless',
   format: 'raw',
   tls: true,
   host: route.query.host?.toString() || 'vpn.bits.co.id',
@@ -58,19 +56,14 @@ const proxySettings = reactive<ProxySettings>({
 const activeHost = computed(() =>
   proxySettings.wildcard ? `${proxySettings.server}.${proxySettings.host}` : proxySettings.host
 )
+const exportFormatLabel = 'Link'
 
 const countryLabel = computed(() => myip.country?.trim() || 'Country unavailable')
 const cityLabel = computed(() => myip.city?.trim() || 'City unavailable')
-const protocolOptions = getProtocols()
-const formatOptions = getFormats()
 const countryMenuRef = ref<HTMLElement | null>(null)
-const protocolMenuRef = ref<HTMLElement | null>(null)
-const formatMenuRef = ref<HTMLElement | null>(null)
 
 function closeAllMenus() {
   isCountryMenuOpen.value = false
-  isProtocolMenuOpen.value = false
-  isFormatMenuOpen.value = false
 }
 
 function toggleCountryMenu() {
@@ -84,43 +77,11 @@ function selectCountry(country: string) {
   isCountryMenuOpen.value = false
 }
 
-function toggleProtocolMenu() {
-  const next = !isProtocolMenuOpen.value
-  closeAllMenus()
-  isProtocolMenuOpen.value = next
-}
-
-function toggleFormatMenu() {
-  const next = !isFormatMenuOpen.value
-  closeAllMenus()
-  isFormatMenuOpen.value = next
-}
-
-function selectProtocol(protocol: string) {
-  if (!protocolOptions.includes(protocol)) return
-  proxySettings.protocol = protocol as ProxySettings['protocol']
-  isProtocolMenuOpen.value = false
-}
-
-function selectFormat(format: string) {
-  if (!formatOptions.includes(format)) return
-  proxySettings.format = format as ProxySettings['format']
-  isFormatMenuOpen.value = false
-}
-
 function closeMenusOnOutsideClick(event: PointerEvent) {
   const target = event.target as Node
 
   if (countryMenuRef.value && !countryMenuRef.value.contains(target)) {
     isCountryMenuOpen.value = false
-  }
-
-  if (protocolMenuRef.value && !protocolMenuRef.value.contains(target)) {
-    isProtocolMenuOpen.value = false
-  }
-
-  if (formatMenuRef.value && !formatMenuRef.value.contains(target)) {
-    isFormatMenuOpen.value = false
   }
 }
 
@@ -222,11 +183,11 @@ async function copyToClipboard() {
     )
     const configResult = await parseProxies(selectedProxyItems, proxySettings)
     await navigator.clipboard.writeText(configResult)
-    noticeText.value = 'Proxy copied to clipboard!'
+    noticeText.value = 'VLESS link copied to clipboard!'
     noticeTone.value = 'success'
     isNoticeOpen.value = true
   } catch {
-    noticeText.value = 'Failed to copy proxy config.'
+    noticeText.value = 'Failed to copy VLESS link.'
     noticeTone.value = 'error'
     isNoticeOpen.value = true
   }
@@ -372,77 +333,19 @@ function goToLastPage() {
             </div>
           </label>
 
-          <div
-            ref="protocolMenuRef"
-            class="field menu-field"
-            :class="isProtocolMenuOpen ? 'is-open' : ''"
-          >
+          <div class="field">
             <span>Protocol</span>
-            <button
-              type="button"
-              class="field-select"
-              :aria-expanded="isProtocolMenuOpen"
-              aria-haspopup="listbox"
-              @click="toggleProtocolMenu"
-            >
-              <span class="select-text">{{ proxySettings.protocol }}</span>
-              <span class="select-caret"><Icon name="uil:angle-down" size="13" /></span>
-            </button>
-            <div
-              v-if="isProtocolMenuOpen"
-              class="select-menu settings-menu"
-              role="listbox"
-              aria-label="Select protocol"
-            >
-              <button
-                v-for="protocol in protocolOptions"
-                :key="protocol"
-                type="button"
-                class="select-option"
-                :class="protocol === proxySettings.protocol ? 'active' : ''"
-                role="option"
-                :aria-selected="protocol === proxySettings.protocol"
-                @click="selectProtocol(protocol)"
-              >
-                {{ protocol }}
-              </button>
+            <div class="field-shell static-field">
+              <Icon name="uil:shield" size="13" />
+              <span class="static-value">{{ proxySettings.protocol.toUpperCase() }}</span>
             </div>
           </div>
 
-          <div
-            ref="formatMenuRef"
-            class="field menu-field"
-            :class="isFormatMenuOpen ? 'is-open' : ''"
-          >
+          <div class="field">
             <span>Format</span>
-            <button
-              type="button"
-              class="field-select"
-              :aria-expanded="isFormatMenuOpen"
-              aria-haspopup="listbox"
-              @click="toggleFormatMenu"
-            >
-              <span class="select-text">{{ proxySettings.format }}</span>
-              <span class="select-caret"><Icon name="uil:angle-down" size="13" /></span>
-            </button>
-            <div
-              v-if="isFormatMenuOpen"
-              class="select-menu settings-menu"
-              role="listbox"
-              aria-label="Select format"
-            >
-              <button
-                v-for="format in formatOptions"
-                :key="format"
-                type="button"
-                class="select-option"
-                :class="format === proxySettings.format ? 'active' : ''"
-                role="option"
-                :aria-selected="format === proxySettings.format"
-                @click="selectFormat(format)"
-              >
-                {{ format }}
-              </button>
+            <div class="field-shell static-field">
+              <Icon name="uil:link" size="13" />
+              <span class="static-value">{{ exportFormatLabel }}</span>
             </div>
           </div>
         </div>
@@ -587,9 +490,9 @@ function goToLastPage() {
       <button
         class="panel-button export"
         @click="copyToClipboard"
-        aria-label="Export selected proxies"
+        aria-label="Copy selected VLESS links"
       >
-        <Icon name="uil:import" size="14" aria-hidden="true" /> Export
+        <Icon name="uil:link" size="14" aria-hidden="true" /> Copy Link
       </button>
     </div>
 
@@ -898,6 +801,16 @@ function goToLastPage() {
 .field-select :deep(svg),
 .toggle-label :deep(svg) {
   color: #9fb4db;
+}
+
+.static-field {
+  justify-content: flex-start;
+}
+
+.static-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 .menu-field {

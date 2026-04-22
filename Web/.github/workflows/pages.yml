@@ -1,4 +1,4 @@
-name: Deploy Proxy Worker
+name: Deploy Web Pages
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy worker
+    name: Build and deploy web
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -29,13 +29,17 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Deploy with Wrangler
+      - name: Build Nuxt app
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
+          command: pages deploy .output/public
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
 
       - name: Notice
         run: |
-          echo "::notice::Deployed Proxy Worker from ${{ github.event.inputs.commit || github.ref }}"
+          echo "::notice::Deployed Web Pages from ${{ github.event.inputs.commit || github.ref }}"

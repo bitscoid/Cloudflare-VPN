@@ -4,6 +4,7 @@
   "license": "ISC",
   "type": "module",
   "scripts": {
+    "scan:proxy-list": "bun run ./helper/proxy-list.ts",
     "typecheck": "bun x tsc --noEmit"
   },
   "devDependencies": {
@@ -13,7 +14,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@types/node": "^22.10.2",
-    "javascript-obfuscator": "^4.1.1"
+    "@types/node": "^22.10.2"
   }
 }

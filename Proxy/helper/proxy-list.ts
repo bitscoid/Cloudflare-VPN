@@ -27,14 +27,14 @@ interface KVPair {
 
 let myGeoIpString: string | null = null;
 
-const KV_PAIR_PROXY_FILE = "./kvProxyList.json";
+const KV_PROXY_LIST_FILE = "./kvProxyList.json";
 const RAW_PROXY_LIST_FILE = "./allProxyList.txt";
-const PROXY_LIST_FILE = "./proxyList.txt";
+const ACTIVE_PROXY_LIST_FILE = "./proxyList.txt";
 const IP_RESOLVER_DOMAIN = "vpn.bits.co.id";
 const IP_RESOLVER_PATH = "/api/v1/myip";
 const CONCURRENCY = 99;
 
-const CHECK_QUEUE: string[] = [];
+let activeChecks = 0;
 
 async function sendRequest(host: string, path: string, proxy: ProxyStruct | null = null): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -64,6 +64,7 @@ async function sendRequest(host: string, path: string, proxy: ProxyStruct | null
       resolve(body);
     });
     socket.on("error", (error) => {
+      clearTimeout(timeout);
       reject(error);
     });
   });
@@ -129,7 +130,7 @@ async function readProxyList(): Promise<ProxyStruct[]> {
 
 (async () => {
   const proxyList = await readProxyList();
-  const proxyChecked: string[] = [];
+  const checkedProxyKeys = new Set<string>();
   const uniqueRawProxies: string[] = [];
   const activeProxyList: string[] = [];
   const kvPair: KVPair = {};
@@ -139,23 +140,23 @@ async function readProxyList(): Promise<ProxyStruct[]> {
   for (let i = 0; i < proxyList.length; i++) {
     const proxy = proxyList[i];
     const proxyKey = `${proxy.address}:${proxy.port}`;
-    if (!proxyChecked.includes(proxyKey)) {
-      proxyChecked.push(proxyKey);
+    if (!checkedProxyKeys.has(proxyKey)) {
+      checkedProxyKeys.add(proxyKey);
       try {
         uniqueRawProxies.push(`${proxy.address},${proxy.port},${proxy.country},${proxy.org.replaceAll(/[+]/g, " ")}`);
-      } catch (error: unknown) {
+      } catch {
         continue;
       }
     } else {
       continue;
     }
 
-    CHECK_QUEUE.push(proxyKey);
+    activeChecks += 1;
     checkProxy(proxy.address, proxy.port)
       .then((res) => {
         if (!res.error && res.result?.proxyip === true && res.result.country) {
           activeProxyList.push(
-            `${res.result?.proxy},${res.result?.port},${res.result?.country},${res.result?.asOrganization}`
+            `${res.result.proxy},${res.result.port},${res.result.country},${res.result.asOrganization}`,
           );
 
           if (kvPair[res.result.country] == undefined) kvPair[res.result.country] = [];
@@ -168,25 +169,24 @@ async function readProxyList(): Promise<ProxyStruct[]> {
         }
       })
       .finally(() => {
-        CHECK_QUEUE.pop();
+        activeChecks -= 1;
       });
 
-    while (CHECK_QUEUE.length >= CONCURRENCY) {
+    while (activeChecks >= CONCURRENCY) {
       await Bun.sleep(1);
     }
   }
 
-  // Waiting for all process to be completed
-  while (CHECK_QUEUE.length) {
+  while (activeChecks) {
     await Bun.sleep(1);
   }
 
   uniqueRawProxies.sort(sortByCountry);
   activeProxyList.sort(sortByCountry);
 
-  await Bun.write(KV_PAIR_PROXY_FILE, JSON.stringify(kvPair, null, "  "));
+  await Bun.write(KV_PROXY_LIST_FILE, JSON.stringify(kvPair, null, "  "));
   await Bun.write(RAW_PROXY_LIST_FILE, uniqueRawProxies.join("\n"));
-  await Bun.write(PROXY_LIST_FILE, activeProxyList.join("\n"));
+  await Bun.write(ACTIVE_PROXY_LIST_FILE, activeProxyList.join("\n"));
 
   console.log(`Waktu proses: ${(Bun.nanoseconds() / 1000000000).toFixed(2)} detik`);
   process.exit(0);

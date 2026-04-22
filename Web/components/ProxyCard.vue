@@ -48,12 +48,13 @@ function toggleIsSelected() {
 }
 
 onMounted(() => {
-  checkProxyHealth()
   toggleIsSelected()
 })
 
 watch(props, () => {
-  checkProxyHealth()
+  stats.proxyip = false
+  stats.delay = 0
+  stats.loading = false
   toggleIsSelected()
 })
 
