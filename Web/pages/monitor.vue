@@ -41,8 +41,13 @@ async function fetchServerData<T>(
 ): Promise<{ error: false; result: T } | { error: true; message: string }> {
   try {
     const res = await fetch(`https://${server}/api/v1/${endpoint}`)
+    const text = await res.text()
     if (res.status === 200) {
-      return { error: false, result: (await res.json()) as T }
+      try {
+        return { error: false, result: JSON.parse(text) as T }
+      } catch {
+        return { error: false, result: text as unknown as T }
+      }
     }
     throw new Error(res.statusText)
   } catch (e: Error) {

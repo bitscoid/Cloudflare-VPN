@@ -50,7 +50,7 @@ useHead(() => {
           <button @click="clearError">Try Again</button>
         </div>
       </div>
-      <NuxtPage v-else :transition="{ name: 'page', mode: 'out-in' }" />
+      <NuxtPage v-else />
     </NuxtLayout>
   </div>
 </template>
@@ -114,53 +114,6 @@ body {
   background: linear-gradient(45deg, #00dc82, #36e4da 50%, #0047e1);
   filter: blur(20vh);
   opacity: 0.95;
-}
-
-.page-enter-active,
-.page-leave-active {
-  transition: all 0.35s ease;
-}
-
-.page-enter-from,
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(12px) scale(0.99);
-}
-
-@keyframes reveal {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulseIcon {
-  0%,
-  100% {
-    box-shadow:
-      inset 0 0 0 1px rgba(79, 140, 255, 0.2),
-      0 0 0 rgba(79, 140, 255, 0);
-  }
-  50% {
-    box-shadow:
-      inset 0 0 0 1px rgba(79, 140, 255, 0.34),
-      0 0 14px rgba(79, 140, 255, 0.26);
-  }
-}
-
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .error-boundary {
