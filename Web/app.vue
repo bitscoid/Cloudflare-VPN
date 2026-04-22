@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const route = useRoute();
 const appName = "BITS VPN";
+const error = ref<Error | null>(null);
 
 function getNormalizedPath(path: string) {
   if (!path || path === "/") return "/";
@@ -10,6 +11,16 @@ function getNormalizedPath(path: string) {
 function isSinglePagePath(path: string) {
   const normalized = getNormalizedPath(path);
   return normalized === "/" || normalized === "/convert" || normalized === "/monitor";
+}
+
+onErrorCaptured((err: Error) => {
+  error.value = err;
+  console.error("App error:", err.message);
+  return false;
+});
+
+function clearError() {
+  error.value = null;
 }
 
 useHead(() => {
@@ -31,7 +42,15 @@ useHead(() => {
   <div class="app-canvas">
     <NuxtRouteAnnouncer />
     <NuxtLayout>
-      <NuxtPage :transition="{ name: 'page', mode: 'out-in' }" />
+      <div v-if="error" class="error-boundary">
+        <div class="error-card">
+          <Icon name="uil:exclamation-triangle" size="32" />
+          <h2>Something went wrong</h2>
+          <p>{{ error.message }}</p>
+          <button @click="clearError">Try Again</button>
+        </div>
+      </div>
+      <NuxtPage v-else :transition="{ name: 'page', mode: 'out-in' }" />
     </NuxtLayout>
   </div>
 </template>
@@ -138,5 +157,53 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1rem;
+}
+
+.error-card {
+  display: grid;
+  gap: 0.75rem;
+  text-align: center;
+  padding: 2rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 99, 132, 0.4);
+  background: rgba(70, 23, 36, 0.92);
+  color: #ffc9d2;
+  max-width: 360px;
+}
+
+.error-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #fff;
+}
+
+.error-card p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #ffa3b3;
+}
+
+.error-card button {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 183, 107, 0.5);
+  background: rgba(255, 183, 107, 0.15);
+  color: #ffd1a3;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: 0.2s;
+}
+
+.error-card button:hover {
+  background: rgba(255, 183, 107, 0.25);
 }
 </style>

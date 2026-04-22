@@ -21,10 +21,14 @@ interface ProxyTestResult {
   };
 }
 
-let myGeoIpString: any = null;
+interface KVPair {
+  [country: string]: string[];
+}
+
+let myGeoIpString: string | null = null;
 
 const KV_PAIR_PROXY_FILE = "./kvProxyList.json";
-const RAW_PROXY_LIST_FILE = "./rawProxyList.txt";
+const RAW_PROXY_LIST_FILE = "./allProxyList.txt";
 const PROXY_LIST_FILE = "./proxyList.txt";
 const IP_RESOLVER_DOMAIN = "vpn.bits.co.id";
 const IP_RESOLVER_PATH = "/api/v1/myip";
@@ -32,10 +36,10 @@ const CONCURRENCY = 99;
 
 const CHECK_QUEUE: string[] = [];
 
-async function sendRequest(host: string, path: string, proxy: any = null) {
+async function sendRequest(host: string, path: string, proxy: ProxyStruct | null = null): Promise<string> {
   return new Promise((resolve, reject) => {
     const options = {
-      host: proxy ? proxy.host : host,
+      host: proxy ? proxy.address : host,
       port: proxy ? proxy.port : 443,
       servername: host,
     };
@@ -60,7 +64,6 @@ async function sendRequest(host: string, path: string, proxy: any = null) {
       resolve(body);
     });
     socket.on("error", (error) => {
-      // console.log(error);
       reject(error);
     });
   });
@@ -72,7 +75,7 @@ export async function checkProxy(proxyAddress: string, proxyPort: number): Promi
     error: true,
   };
 
-  const proxyInfo = { host: proxyAddress, port: proxyPort };
+  const proxyInfo: ProxyStruct = { address: proxyAddress, port: proxyPort, country: "", org: "" };
 
   try {
     const start = new Date().getTime();
@@ -82,11 +85,10 @@ export async function checkProxy(proxyAddress: string, proxyPort: number): Promi
     ]);
     const finish = new Date().getTime();
 
-    // Save local geoip
     if (myGeoIpString == null) myGeoIpString = myip;
 
-    const parsedIpInfo = JSON.parse(ipinfo as string);
-    const parsedMyIp = JSON.parse(myip as string);
+    const parsedIpInfo = JSON.parse(ipinfo);
+    const parsedMyIp = JSON.parse(myip);
 
     if (parsedIpInfo.ip && parsedIpInfo.ip !== parsedMyIp.ip) {
       result = {
@@ -100,37 +102,13 @@ export async function checkProxy(proxyAddress: string, proxyPort: number): Promi
         },
       };
     }
-  } catch (error: any) {
-    result.message = error.message;
+  } catch (error: unknown) {
+    const err = error as Error;
+    result.message = err.message;
   }
 
   return result;
 }
-
-// async function checkProxy(proxyAddress: string, proxyPort: number): Promise<ProxyTestResult> {
-//   const controller = new AbortController();
-//   setTimeout(() => controller.abort(), 5000);
-
-//   try {
-//     const res = await Bun.fetch(IP_RESOLVER_DOMAIN + `?ip=${proxyAddress}:${proxyPort}`, {
-//       signal: controller.signal,
-//     });
-
-//     if (res.status == 200) {
-//       return {
-//         error: false,
-//         result: await res.json(),
-//       };
-//     } else {
-//       throw new Error(res.statusText);
-//     }
-//   } catch (e: any) {
-//     return {
-//       error: true,
-//       message: e.message,
-//     };
-//   }
-// }
 
 async function readProxyList(): Promise<ProxyStruct[]> {
   const proxyList: ProxyStruct[] = [];
@@ -154,7 +132,7 @@ async function readProxyList(): Promise<ProxyStruct[]> {
   const proxyChecked: string[] = [];
   const uniqueRawProxies: string[] = [];
   const activeProxyList: string[] = [];
-  const kvPair: any = {};
+  const kvPair: KVPair = {};
 
   let proxySaved = 0;
 
@@ -165,7 +143,7 @@ async function readProxyList(): Promise<ProxyStruct[]> {
       proxyChecked.push(proxyKey);
       try {
         uniqueRawProxies.push(`${proxy.address},${proxy.port},${proxy.country},${proxy.org.replaceAll(/[+]/g, " ")}`);
-      } catch (e: any) {
+      } catch (error: unknown) {
         continue;
       }
     } else {
