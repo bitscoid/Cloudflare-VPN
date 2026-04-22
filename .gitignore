@@ -27,3 +27,6 @@ Proxy/node_modules/
 Proxy/.wrangler/
 Proxy/.cache/
 Proxy/coverage/
+
+# Root wrangler cache
+.wrangler/
