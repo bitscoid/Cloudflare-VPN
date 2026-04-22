@@ -7,7 +7,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Jakarta"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "deps"
       include: "scope"
@@ -24,7 +24,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Jakarta"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "deps"
       include: "scope"
