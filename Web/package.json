@@ -1,7 +1,7 @@
 {
   "name": "nuxt-app",
   "dependencies": {
-    "nuxt": "^4.4.2",
+    "nuxt": "^4.4.4",
     "pretty-bytes": "^7.1.0",
     "vue": "latest",
     "vue-router": "latest"
